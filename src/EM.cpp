@@ -496,7 +496,7 @@ bool maximizeCellStates(EMResult& result, const EMHelperVariables& helpers)
 			result.cellEscapeFraction[cell] = patCe;
 		}
 	}
-	std::cerr << cellsChanged << " cell statuses changed, " << escapeChanged << " cell escapes changed" << std::endl;
+	std::cerr << cellsChanged << " cell actives changed, " << escapeChanged << " cell escapes changed" << std::endl;
 	return changed;
 }
 
@@ -682,10 +682,6 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 		result.cellEscapeFraction[cell] = -1;
 	}
 	initializeRandomly(result, forcedPhases, randomSeed);
-	{
-		std::ofstream initial { "initial.txt" };
-		writeResult(result, cellMatches, helpers, initial);
-	}
 	size_t overlapBetweenForcedVariantsAndAllVariants = 0;
 	for (size_t variant = 0; variant < result.variantIsMatRef.size(); variant++)
 	{
@@ -696,26 +692,27 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 	}
 	std::cerr << overlapBetweenForcedVariantsAndAllVariants << " overlap between forced variants and all variants" << std::endl;
 	size_t iteration = 0;
-	std::cerr << "get initial log likelihood sum" << std::endl;
 	double logprob = getTotalLogProb(result, helpers);
-	std::cerr << "initial log likelihood sum " << logprob << std::endl;
+	std::cerr << "initial non-normalized log likelihood sum " << logprob << std::endl;
 	while (true)
 	{
 		bool cellChanged = maximizeCellStates(result, helpers);
 		if (cellChanged)
 		{
 			logprob = getTotalLogProb(result, helpers);
-			std::cerr << "iteration " << iteration << " log likelihood sum " << logprob << std::endl;
+			std::cerr << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
 		}
 		bool variantChanged = maximizeVariantStates(result, forcedPhases, helpers);
 		if (variantChanged)
 		{
 			logprob = getTotalLogProb(result, helpers);
-			std::cerr << "iteration " << iteration << " log likelihood sum " << logprob << std::endl;
+			std::cerr << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
 		}
 		iteration += 1;
 		if (!cellChanged && !variantChanged) break;
 	}
+	logprob = getTotalLogProb(result, helpers);
+	std::cerr << "final non-normalized log likelihood sum " << logprob << std::endl;
 }
 
 std::unordered_map<size_t, bool> readForcedVariantPhases(const std::string& filename, const EMResult& EMresult)
