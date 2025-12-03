@@ -34,8 +34,6 @@ public:
 struct EMHelperVariables
 {
 public:
-	std::unordered_map<std::string, double> variantImportance;
-	std::unordered_map<std::string, double> cellImportance;
 	std::unordered_map<std::string, size_t> variantCoverage;
 	std::unordered_map<std::string, double> cellCoverageFraction;
 	std::unordered_map<std::string, std::unordered_map<std::string, size_t>> cellVariantRefCount;
@@ -113,7 +111,7 @@ void initializeRandomly(EMResult& result, const std::unordered_map<std::string, 
 	}
 }
 
-double logprob(const size_t n, const double cellCoverageFraction, const double variantCoverage, const double cellEscapeFraction, const double variantEscapeFraction, const bool active, const double cellImportance, const double variantImportance)
+double logprob(const size_t n, const double cellCoverageFraction, const double variantCoverage, const double cellEscapeFraction, const double variantEscapeFraction, const bool active)
 {
 	assert(cellCoverageFraction >= 0.0 - epsilon);
 	assert(cellCoverageFraction <= 1.0 + epsilon);
@@ -121,7 +119,6 @@ double logprob(const size_t n, const double cellCoverageFraction, const double v
 	assert(cellEscapeFraction <= maxEscape + epsilon);
 	assert(variantEscapeFraction >= 0.0 - epsilon);
 	assert(variantEscapeFraction <= maxEscape + epsilon);
-	const double importanceFactor = cellImportance * variantImportance;
 	const double E = 1.0 - (1.0-cellEscapeFraction) * (1.0-variantEscapeFraction);
 	double lambda;
 	if (active)
@@ -134,20 +131,19 @@ double logprob(const size_t n, const double cellCoverageFraction, const double v
 		double Ef = E * 0.5;
 		lambda = cellCoverageFraction * variantCoverage * Ef;
 	}
-	if (n == 0) return -lambda * importanceFactor;
+	if (n == 0) return -lambda;
 	assert(lambda > 0);
 	double result = n * log(lambda) - lambda;
 	for (size_t i = 2; i <= n; i++)
 	{
 		result -= log(i);
 	}
-	result *= importanceFactor;
 	assert(result < epsilon);
 	return result;
 }
 
 // derivative by Ce
-double logprobDerivativeCe(const size_t n, const double cellCoverageFraction, const double variantCoverage, const double cellEscapeFraction, const double variantEscapeFraction, const bool active, const double cellImportance, const double variantImportance)
+double logprobDerivativeCe(const size_t n, const double cellCoverageFraction, const double variantCoverage, const double cellEscapeFraction, const double variantEscapeFraction, const bool active)
 {
 	assert(cellCoverageFraction >= 0.0 - epsilon);
 	assert(cellCoverageFraction <= 1.0 + epsilon);
@@ -155,7 +151,6 @@ double logprobDerivativeCe(const size_t n, const double cellCoverageFraction, co
 	assert(cellEscapeFraction <= maxEscape + epsilon);
 	assert(variantEscapeFraction >= 0.0 - epsilon);
 	assert(variantEscapeFraction <= maxEscape + epsilon);
-	const double importanceFactor = cellImportance * variantImportance;
 	const double E = 1.0 - (1.0-cellEscapeFraction) * (1.0-variantEscapeFraction);
 	double lambda;
 	double lambdaDerivative;
@@ -171,15 +166,14 @@ double logprobDerivativeCe(const size_t n, const double cellCoverageFraction, co
 		lambda = cellCoverageFraction * variantCoverage * Ef;
 		lambdaDerivative = cellCoverageFraction * variantCoverage * (1.0 - variantEscapeFraction) / 2.0;
 	}
-	if (n == 0) return (-1) * lambdaDerivative * importanceFactor;
+	if (n == 0) return (-1) * lambdaDerivative;
 	assert(lambda > 0);
 	double result = ((double)n / lambda - 1.0) * lambdaDerivative;
-	result *= importanceFactor;
 	return result;
 }
 
 // derivative by Xe
-double logprobDerivativeXe(const size_t n, const double cellCoverageFraction, const double variantCoverage, const double cellEscapeFraction, const double variantEscapeFraction, const bool active, const double cellImportance, const double variantImportance)
+double logprobDerivativeXe(const size_t n, const double cellCoverageFraction, const double variantCoverage, const double cellEscapeFraction, const double variantEscapeFraction, const bool active)
 {
 	assert(cellCoverageFraction >= 0.0 - epsilon);
 	assert(cellCoverageFraction <= 1.0 + epsilon);
@@ -187,7 +181,6 @@ double logprobDerivativeXe(const size_t n, const double cellCoverageFraction, co
 	assert(cellEscapeFraction <= maxEscape + epsilon);
 	assert(variantEscapeFraction >= 0.0 - epsilon);
 	assert(variantEscapeFraction <= maxEscape + epsilon);
-	const double importanceFactor = cellImportance * variantImportance;
 	const double E = 1.0 - (1.0-cellEscapeFraction) * (1.0-variantEscapeFraction);
 	double lambda;
 	double lambdaDerivative;
@@ -203,10 +196,9 @@ double logprobDerivativeXe(const size_t n, const double cellCoverageFraction, co
 		lambda = cellCoverageFraction * variantCoverage * Ef;
 		lambdaDerivative = cellCoverageFraction * variantCoverage * (1.0 - cellEscapeFraction) / 2.0;
 	}
-	if (n == 0) return (-1) * lambdaDerivative * importanceFactor;
+	if (n == 0) return (-1) * lambdaDerivative;
 	assert(lambda > 0);
 	double result = ((double)n / lambda - 1.0) * lambdaDerivative;
-	result *= importanceFactor;
 	return result;
 }
 
@@ -214,7 +206,6 @@ double getCellLogProbDerivative(const EMResult& result, const std::vector<CellMa
 {
 	double derivativeSum = 0;
 	const double f_j = helpers.cellCoverageFraction.at(cell);
-	const double cellImportance = helpers.cellImportance.at(cell);
 	assert(f_j >= 0.0 - epsilon);
 	assert(f_j <= 1.0 + epsilon);
 	for (const std::string& variant : helpers.activeVariantsPerCell.at(cell))
@@ -226,16 +217,15 @@ double getCellLogProbDerivative(const EMResult& result, const std::vector<CellMa
 		assert(Xe <= maxEscape - escapeBoundary + epsilon);
 		const size_t refCount = getCount(helpers.cellVariantRefCount, cell, variant);
 		const size_t altCount = getCount(helpers.cellVariantAltCount, cell, variant);
-		const double variantImportance = helpers.variantImportance.at(variant);
 		const bool activeMatchPhase = (result.variantIsMatRef.at(variant) == matActive);
 		assert(refCount+altCount <= c_i);
 		if (refCount > 0)
 		{
-			derivativeSum += logprobDerivativeCe(refCount, f_j, c_i, Ce, Xe, activeMatchPhase, cellImportance, variantImportance) - logprobDerivativeCe(0, f_j, c_i, Ce, Xe, activeMatchPhase, cellImportance, variantImportance);
+			derivativeSum += logprobDerivativeCe(refCount, f_j, c_i, Ce, Xe, activeMatchPhase) - logprobDerivativeCe(0, f_j, c_i, Ce, Xe, activeMatchPhase);
 		}
 		if (altCount > 0)
 		{
-			derivativeSum += logprobDerivativeCe(altCount, f_j, c_i, Ce, Xe, !activeMatchPhase, cellImportance, variantImportance) - logprobDerivativeCe(0, f_j, c_i, Ce, Xe, !activeMatchPhase, cellImportance, variantImportance);
+			derivativeSum += logprobDerivativeCe(altCount, f_j, c_i, Ce, Xe, !activeMatchPhase) - logprobDerivativeCe(0, f_j, c_i, Ce, Xe, !activeMatchPhase);
 		}
 	}
 	return derivativeSum;
@@ -245,7 +235,6 @@ double getCellLogProb(const EMResult& result, const std::vector<CellMatch>& cell
 {
 	double logProbSum = 0;
 	const double f_j = helpers.cellCoverageFraction.at(cell);
-	const double cellImportance = helpers.cellImportance.at(cell);
 	assert(f_j >= 0.0 - epsilon);
 	assert(f_j <= 1.0 + epsilon);
 	for (const std::string& variant : helpers.activeVariantsPerCell.at(cell))
@@ -257,16 +246,15 @@ double getCellLogProb(const EMResult& result, const std::vector<CellMatch>& cell
 		const size_t c_i = helpers.variantCoverage.at(variant);
 		const size_t refCount = getCount(helpers.cellVariantRefCount, cell, variant);
 		const size_t altCount = getCount(helpers.cellVariantAltCount, cell, variant);
-		const double variantImportance = helpers.variantImportance.at(variant);
 		const bool activeMatchPhase = (result.variantIsMatRef.at(variant) == matActive);
 		assert(refCount+altCount <= c_i);
 		if (refCount > 0)
 		{
-			logProbSum += logprob(refCount, f_j, c_i, Ce, Xe, activeMatchPhase, cellImportance, variantImportance) - logprob(0, f_j, c_i, Ce, Xe, activeMatchPhase, cellImportance, variantImportance);
+			logProbSum += logprob(refCount, f_j, c_i, Ce, Xe, activeMatchPhase) - logprob(0, f_j, c_i, Ce, Xe, activeMatchPhase);
 		}
 		if (altCount > 0)
 		{
-			logProbSum += logprob(altCount, f_j, c_i, Ce, Xe, !activeMatchPhase, cellImportance, variantImportance) - logprob(0, f_j, c_i, Ce, Xe, !activeMatchPhase, cellImportance, variantImportance);
+			logProbSum += logprob(altCount, f_j, c_i, Ce, Xe, !activeMatchPhase) - logprob(0, f_j, c_i, Ce, Xe, !activeMatchPhase);
 		}
 	}
 	return logProbSum;
@@ -275,7 +263,6 @@ double getCellLogProb(const EMResult& result, const std::vector<CellMatch>& cell
 double getVariantLogProbDerivative(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, const std::string& variant, const double Xe, const bool matRef)
 {
 	const size_t c_i = helpers.variantCoverage.at(variant);
-	const double variantImportance = helpers.variantImportance.at(variant);
 	double derivativeSum = 0;
 	for (const std::string& cell : helpers.activeCellsPerVariant.at(variant))
 	{
@@ -283,15 +270,14 @@ double getVariantLogProbDerivative(const EMResult& result, const std::vector<Cel
 		const double Ce = result.cellEscapeFraction.at(cell);
 		const size_t refCount = getCount(helpers.cellVariantRefCount, cell, variant);
 		const size_t altCount = getCount(helpers.cellVariantAltCount, cell, variant);
-		const double cellImportance = helpers.cellImportance.at(cell);
 		const bool activeMatchPhase = (result.cellIsMatActive.at(cell) == matRef);
 		if (refCount > 0)
 		{
-			derivativeSum += logprobDerivativeXe(refCount, f_j, c_i, Ce, Xe, activeMatchPhase, cellImportance, variantImportance) - logprobDerivativeXe(0, f_j, c_i, Ce, Xe, activeMatchPhase, cellImportance, variantImportance);
+			derivativeSum += logprobDerivativeXe(refCount, f_j, c_i, Ce, Xe, activeMatchPhase) - logprobDerivativeXe(0, f_j, c_i, Ce, Xe, activeMatchPhase);
 		}
 		if (altCount > 0)
 		{
-			derivativeSum += logprobDerivativeXe(altCount, f_j, c_i, Ce, Xe, !activeMatchPhase, cellImportance, variantImportance) - logprobDerivativeXe(0, f_j, c_i, Ce, Xe, !activeMatchPhase, cellImportance, variantImportance);
+			derivativeSum += logprobDerivativeXe(altCount, f_j, c_i, Ce, Xe, !activeMatchPhase) - logprobDerivativeXe(0, f_j, c_i, Ce, Xe, !activeMatchPhase);
 		}
 	}
 	return derivativeSum;
@@ -300,7 +286,6 @@ double getVariantLogProbDerivative(const EMResult& result, const std::vector<Cel
 double getVariantLogProbs(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, const std::string& variant, const double Xe, const bool matRef)
 {
 	const size_t c_i = helpers.variantCoverage.at(variant);
-	const double variantImportance = helpers.variantImportance.at(variant);
 	double logProbSum = 0;
 	for (const std::string& cell : helpers.activeCellsPerVariant.at(variant))
 	{
@@ -308,15 +293,14 @@ double getVariantLogProbs(const EMResult& result, const std::vector<CellMatch>& 
 		const double Ce = result.cellEscapeFraction.at(cell);
 		const size_t refCount = getCount(helpers.cellVariantRefCount, cell, variant);
 		const size_t altCount = getCount(helpers.cellVariantAltCount, cell, variant);
-		const double cellImportance = helpers.cellImportance.at(cell);
 		const bool activeMatchPhase = (result.cellIsMatActive.at(cell) == matRef);
 		if (refCount > 0)
 		{
-			logProbSum += logprob(refCount, f_j, c_i, Ce, Xe, activeMatchPhase, cellImportance, variantImportance) - logprob(0, f_j, c_i, Ce, Xe, activeMatchPhase, cellImportance, variantImportance);
+			logProbSum += logprob(refCount, f_j, c_i, Ce, Xe, activeMatchPhase) - logprob(0, f_j, c_i, Ce, Xe, activeMatchPhase);
 		}
 		if (altCount > 0)
 		{
-			logProbSum += logprob(altCount, f_j, c_i, Ce, Xe, !activeMatchPhase, cellImportance, variantImportance) - logprob(0, f_j, c_i, Ce, Xe, !activeMatchPhase, cellImportance, variantImportance);
+			logProbSum += logprob(altCount, f_j, c_i, Ce, Xe, !activeMatchPhase) - logprob(0, f_j, c_i, Ce, Xe, !activeMatchPhase);
 		}
 	}
 	return logProbSum;
@@ -529,7 +513,6 @@ double getNonnormalizedTotalLogProb(const EMResult& result, const std::vector<Ce
 		assert(helpers.variantCoverage.count(variant) == 1);
 		const double Xe = result.variantEscapeFraction.at(variant);
 		const double c_i = helpers.variantCoverage.at(variant);
-		const double variantImportance = helpers.variantImportance.at(variant);
 		for (const std::string& cell : helpers.activeCellsPerVariant.at(variant))
 		{
 			assert(helpers.cellCoverageFraction.count(cell) == 1);
@@ -538,9 +521,8 @@ double getNonnormalizedTotalLogProb(const EMResult& result, const std::vector<Ce
 			const double Ce = result.cellEscapeFraction.at(cell);
 			const bool cellIsMat = result.cellIsMatActive.at(cell);
 			const double f_j = helpers.cellCoverageFraction.at(cell);
-			const double cellImportance = helpers.cellImportance.at(cell);
-			if (refCount > 0) total += logprob(refCount, f_j, c_i, Ce, Xe, pair.second == cellIsMat, cellImportance, variantImportance) - logprob(0, f_j, c_i, Ce, Xe, pair.second == cellIsMat, cellImportance, variantImportance);
-			if (altCount > 0) total += logprob(altCount, f_j, c_i, Ce, Xe, pair.second != cellIsMat, cellImportance, variantImportance) - logprob(0, f_j, c_i, Ce, Xe, pair.second != cellIsMat, cellImportance, variantImportance);
+			if (refCount > 0) total += logprob(refCount, f_j, c_i, Ce, Xe, pair.second == cellIsMat) - logprob(0, f_j, c_i, Ce, Xe, pair.second == cellIsMat);
+			if (altCount > 0) total += logprob(altCount, f_j, c_i, Ce, Xe, pair.second != cellIsMat) - logprob(0, f_j, c_i, Ce, Xe, pair.second != cellIsMat);
 		}
 	}
 	return total;
@@ -661,16 +643,6 @@ EMHelperVariables getHelpers(const std::vector<CellMatch>& cellMatches)
 	for (auto& pair : helpers.cellCoverageFraction)
 	{
 		pair.second /= (double)totalCoverage;
-	}
-	for (const auto& pair : helpers.variantCoverage)
-	{
-		helpers.variantImportance[pair.first] = 1;
-//		helpers.variantImportance[pair.first] = log(2.0+(double)pair.second) / (double)pair.second;
-	}
-	for (const auto& pair : helpers.cellCoverageFraction)
-	{
-		helpers.cellImportance[pair.first] = 1;
-//		helpers.cellImportance[pair.first] = log(2.0+totalCoverage*(double)pair.second) / (double)(totalCoverage * pair.second);
 	}
 	return helpers;
 }
