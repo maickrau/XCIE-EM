@@ -12,6 +12,8 @@
 const double epsilon = 0.0001; // comparisons should be strict but add an epsilon because of float rounding issues
 const double escapeBoundary = 0.001; // bounds X-chromosome inactivation escape to 0+this .. 1-this
 const double maxEscape = 1.0;
+const double variantEscapeBoundary = 0.5;
+const double cellEscapeBoundary = 0.5;
 
 struct CellMatch
 {
@@ -596,7 +598,7 @@ void writeResult(const EMResult& result, const std::vector<CellMatch>& cellMatch
 		double phaseScoreDifference = getVariantLogProbs(result, helpers, variantIndex, matRef ? matXe : patXe, matRef);
 		phaseScoreDifference -= getVariantLogProbs(result, helpers, variantIndex, matRef ? patXe : matXe, !matRef);
 		double escapeDifference = getVariantLogProbs(result, helpers, variantIndex, result.variantEscapeFraction.at(variantIndex), matRef);
-		escapeDifference -= getVariantLogProbs(result, helpers, variantIndex, 0.5, matRef);
+		escapeDifference -= getVariantLogProbs(result, helpers, variantIndex, variantEscapeBoundary, matRef);
 		stream << variant << "\t" << (matRef ? "mat" : "pat") << "\t" << result.variantEscapeFraction[variantIndex] << "\t" << variantCoverage.at(variant) << "\t" << phaseScoreDifference << "\t" << escapeDifference << std::endl;
 	}
 	for (const std::string& cell : cellOrder)
@@ -608,7 +610,7 @@ void writeResult(const EMResult& result, const std::vector<CellMatch>& cellMatch
 		double scoreDifference = getCellLogProb(result, helpers, cellIndex, matActive ? matCe : patCe, matActive);
 		scoreDifference -= getCellLogProb(result, helpers, cellIndex, matActive ? patCe : matCe, !matActive);
 		double escapeDifference = getCellLogProb(result, helpers, cellIndex, result.cellEscapeFraction[cellIndex], matActive);
-		escapeDifference -= getCellLogProb(result, helpers, cellIndex, 0.5, matActive);
+		escapeDifference -= getCellLogProb(result, helpers, cellIndex, cellEscapeBoundary, matActive);
 		stream << cell << "\t" << (matActive ? "mat" : "pat") << "\t" << result.cellEscapeFraction[cellIndex] << "\t" << cellCoverage.at(cell) << "\t" << scoreDifference << "\t" << escapeDifference << std::endl;
 	}
 }
