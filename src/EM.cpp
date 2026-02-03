@@ -445,7 +445,7 @@ bool maximizeVariantStates(EMResult& result, const std::unordered_map<size_t, bo
 			result.variantEscapeFraction[variant] = patXe;
 		}
 	}
-	std::cerr << phasesChanged << " variant phases changed, " << escapeChanged << " variant escapes changed" << std::endl;
+//	std::cerr << phasesChanged << " variant phases changed, " << escapeChanged << " variant escapes changed" << std::endl;
 	return changed;
 }
 
@@ -498,7 +498,7 @@ bool maximizeCellStates(EMResult& result, const EMHelperVariables& helpers)
 			result.cellEscapeFraction[cell] = patCe;
 		}
 	}
-	std::cerr << cellsChanged << " cell actives changed, " << escapeChanged << " cell escapes changed" << std::endl;
+//	std::cerr << cellsChanged << " cell actives changed, " << escapeChanged << " cell escapes changed" << std::endl;
 	return changed;
 }
 
@@ -668,7 +668,7 @@ EMHelperVariables getHelpers(const std::vector<CellMatch>& cellMatches, const EM
 
 void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cellMatches, const std::unordered_map<size_t, bool>& forcedPhases, const EMHelperVariables& helpers, const size_t randomSeed)
 {
-	std::cerr << "initialize with random seed " << randomSeed << std::endl;
+//	std::cerr << "initialize with random seed " << randomSeed << std::endl;
 	assert(result.variantIsMatRef.size() == result.variantNameToIndex.size());
 	assert(result.variantEscapeFraction.size() == result.variantNameToIndex.size());
 	assert(result.cellIsMatActive.size() == result.cellNameToIndex.size());
@@ -692,23 +692,23 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 			overlapBetweenForcedVariantsAndAllVariants += 1;
 		}
 	}
-	std::cerr << overlapBetweenForcedVariantsAndAllVariants << " overlap between forced variants and all variants" << std::endl;
+//	std::cerr << overlapBetweenForcedVariantsAndAllVariants << " overlap between forced variants and all variants" << std::endl;
 	size_t iteration = 0;
 	double logprob = getTotalLogProb(result, helpers);
-	std::cerr << "initial non-normalized log likelihood sum " << logprob << std::endl;
+//	std::cerr << "initial non-normalized log likelihood sum " << logprob << std::endl;
 	while (true)
 	{
 		bool cellChanged = maximizeCellStates(result, helpers);
 		if (cellChanged)
 		{
 			logprob = getTotalLogProb(result, helpers);
-			std::cerr << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
+//			std::cerr << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
 		}
 		bool variantChanged = maximizeVariantStates(result, forcedPhases, helpers);
 		if (variantChanged)
 		{
 			logprob = getTotalLogProb(result, helpers);
-			std::cerr << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
+//			std::cerr << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
 		}
 		iteration += 1;
 		if (!cellChanged && !variantChanged) break;
@@ -772,17 +772,34 @@ int main(int argc, char** argv)
 	std::string matchTableFile { argv[1] };
 	std::string forcedPhaseFile { argv[2] };
 	size_t randomSeed = std::stoull(argv[3]);
+	size_t numTries = std::stoull(argv[4]);
 	std::cerr << "read match counts" << std::endl;
 	std::vector<CellMatch> counts = readMatchCounts(matchTableFile);
-	std::cerr << "initialize" << std::endl;
-	EMResult result = initializeResult(counts);
-	std::cerr << "read forced variant phases" << std::endl;
-	auto forcedPhases = readForcedVariantPhases(forcedPhaseFile, result);
-	std::cerr << forcedPhases.size() << " forced variant phases" << std::endl;
-	std::cerr << "get helper variables" << std::endl;
-	EMHelperVariables helpers = getHelpers(counts, result);
-	std::cerr << "run EM" << std::endl;
-	getMaximumLikelihoodEM(result, counts, forcedPhases, helpers, randomSeed);
-	std::cerr << "write results" << std::endl;
-	writeResult(result, counts, helpers, std::cout);
+	std::vector<size_t> iterationsWithGoodScore;
+	double bestScore = -100000.0;
+	EMResult bestResult;
+	EMHelperVariables bestHelpers;
+	for (size_t iteration = 0; iteration < numTries; iteration++)
+	{
+		std::cerr << "bigiteration " << iteration << std::endl;
+//		std::cerr << "initialize" << std::endl;
+		EMResult result = initializeResult(counts);
+//		std::cerr << "read forced variant phases" << std::endl;
+		auto forcedPhases = readForcedVariantPhases(forcedPhaseFile, result);
+//		std::cerr << forcedPhases.size() << " forced variant phases" << std::endl;
+//		std::cerr << "get helper variables" << std::endl;
+		EMHelperVariables helpers = getHelpers(counts, result);
+//		std::cerr << "run EM" << std::endl;
+		getMaximumLikelihoodEM(result, counts, forcedPhases, helpers, randomSeed+iteration);
+//		std::cerr << "write results" << std::endl;
+		double score = getTotalLogProb(result, helpers);
+		if (iteration == 0 || score > bestScore)
+		{
+			bestScore = score;
+			bestResult = result;
+			bestHelpers = helpers;
+		}
+	}
+	std::cerr << "best score " << bestScore << std::endl;
+	writeResult(bestResult, counts, bestHelpers, std::cout);
 }
