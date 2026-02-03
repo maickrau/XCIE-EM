@@ -27,8 +27,6 @@ public:
 struct EMResult
 {
 public:
-	std::unordered_map<std::string, size_t> variantNameToIndex;
-	std::unordered_map<std::string, size_t> cellNameToIndex;
 	std::vector<bool> cellIsMatActive;
 	std::vector<double> cellEscapeFraction;
 	std::vector<bool> variantIsMatRef;
@@ -38,6 +36,8 @@ public:
 struct EMHelperVariables
 {
 public:
+	std::unordered_map<std::string, size_t> variantNameToIndex;
+	std::unordered_map<std::string, size_t> cellNameToIndex;
 	std::vector<size_t> variantCoverage;
 	std::vector<double> cellCoverageFraction;
 	std::vector<std::unordered_map<size_t, size_t>> cellVariantRefCount;
@@ -602,8 +602,8 @@ std::vector<std::string> getCellOrder(const std::unordered_map<std::string, size
 
 void writeResult(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, std::ostream& stream)
 {
-	std::vector<std::string> variantOrder = getVariantOrder(result.variantNameToIndex);
-	std::vector<std::string> cellOrder = getCellOrder(result.cellNameToIndex);
+	std::vector<std::string> variantOrder = getVariantOrder(helpers.variantNameToIndex);
+	std::vector<std::string> cellOrder = getCellOrder(helpers.cellNameToIndex);
 	std::unordered_map<std::string, size_t> variantCoverage;
 	std::unordered_map<std::string, size_t> cellCoverage;
 	for (const auto& t : cellMatches)
@@ -613,7 +613,7 @@ void writeResult(const EMResult& result, const std::vector<CellMatch>& cellMatch
 	}
 	for (const std::string& variant : variantOrder)
 	{
-		const size_t variantIndex = result.variantNameToIndex.at(variant);
+		const size_t variantIndex = helpers.variantNameToIndex.at(variant);
 		const bool matRef = result.variantIsMatRef[variantIndex];
 		double matXe, patXe;
 		std::tie(matXe, patXe) = getOptimalVariantXe(result, helpers, variantIndex);
@@ -625,7 +625,7 @@ void writeResult(const EMResult& result, const std::vector<CellMatch>& cellMatch
 	}
 	for (const std::string& cell : cellOrder)
 	{
-		const size_t cellIndex = result.cellNameToIndex.at(cell);
+		const size_t cellIndex = helpers.cellNameToIndex.at(cell);
 		const bool matActive = result.cellIsMatActive[cellIndex];
 		double matCe, patCe;
 		std::tie(matCe, patCe) = getOptimalCellCe(result, helpers, cellIndex);
@@ -637,19 +637,32 @@ void writeResult(const EMResult& result, const std::vector<CellMatch>& cellMatch
 	}
 }
 
-EMHelperVariables getHelpers(const std::vector<CellMatch>& cellMatches, const EMResult& result)
+EMHelperVariables getHelpers(const std::vector<CellMatch>& cellMatches)
 {
 	EMHelperVariables helpers;
-	helpers.activeCellsPerVariant.resize(result.variantIsMatRef.size());
-	helpers.activeVariantsPerCell.resize(result.cellIsMatActive.size());
-	helpers.variantCoverage.resize(result.variantIsMatRef.size(), 0);
-	helpers.cellVariantAltCount.resize(result.cellIsMatActive.size());
-	helpers.cellVariantRefCount.resize(result.cellIsMatActive.size());
-	helpers.cellCoverageFraction.resize(result.cellIsMatActive.size(), 0);
 	for (const auto& t : cellMatches)
 	{
-		const size_t variantIndex = result.variantNameToIndex.at(t.variant);
-		const size_t cellIndex = result.cellNameToIndex.at(t.cell);
+		if (helpers.variantNameToIndex.count(t.variant) == 0)
+		{
+			size_t index = helpers.variantNameToIndex.size();
+			helpers.variantNameToIndex[t.variant] = index;
+		}
+		if (helpers.cellNameToIndex.count(t.cell) == 0)
+		{
+			size_t index = helpers.cellNameToIndex.size();
+			helpers.cellNameToIndex[t.cell] = index;
+		}
+	}
+	helpers.activeCellsPerVariant.resize(helpers.variantNameToIndex.size());
+	helpers.activeVariantsPerCell.resize(helpers.cellNameToIndex.size());
+	helpers.variantCoverage.resize(helpers.variantNameToIndex.size(), 0);
+	helpers.cellVariantAltCount.resize(helpers.cellNameToIndex.size());
+	helpers.cellVariantRefCount.resize(helpers.cellNameToIndex.size());
+	helpers.cellCoverageFraction.resize(helpers.cellNameToIndex.size(), 0);
+	for (const auto& t : cellMatches)
+	{
+		const size_t variantIndex = helpers.variantNameToIndex.at(t.variant);
+		const size_t cellIndex = helpers.cellNameToIndex.at(t.cell);
 		helpers.activeCellsPerVariant[variantIndex].emplace_back(cellIndex);
 		helpers.activeVariantsPerCell[cellIndex].emplace_back(variantIndex);
 		helpers.variantCoverage[variantIndex] += t.count;
@@ -677,7 +690,7 @@ EMHelperVariables getHelpers(const std::vector<CellMatch>& cellMatches, const EM
 	size_t totalCoverage = 0;
 	for (const auto& t : cellMatches)
 	{
-		const size_t cellIndex = result.cellNameToIndex.at(t.cell);
+		const size_t cellIndex = helpers.cellNameToIndex.at(t.cell);
 		totalCoverage += t.count;
 		helpers.cellCoverageFraction[cellIndex] += t.count;
 	}
@@ -708,11 +721,11 @@ size_t parseVariantPosition(const std::string& name)
 	return 0;
 }
 
-std::unordered_set<size_t> getIgnoredFirstStepVariants(const EMResult& result, const std::vector<std::pair<size_t, size_t>>& secondStepRegions)
+std::unordered_set<size_t> getIgnoredFirstStepVariants(const EMHelperVariables& helpers, const std::vector<std::pair<size_t, size_t>>& secondStepRegions)
 {
 	if (secondStepRegions.size() == 0) return std::unordered_set<size_t> {};
 	std::unordered_set<size_t> ignored;
-	for (const auto& pair : result.variantNameToIndex)
+	for (const auto& pair : helpers.variantNameToIndex)
 	{
 		size_t parsedPosition = parseVariantPosition(pair.first);
 		for (auto region : secondStepRegions)
@@ -730,10 +743,10 @@ std::unordered_set<size_t> getIgnoredFirstStepVariants(const EMResult& result, c
 void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cellMatches, const std::unordered_map<size_t, bool>& forcedPhases, const EMHelperVariables& helpers, const std::vector<std::pair<size_t, size_t>>& secondStepRegions, const size_t randomSeed)
 {
 //	std::cerr << "initialize with random seed " << randomSeed << std::endl;
-	assert(result.variantIsMatRef.size() == result.variantNameToIndex.size());
-	assert(result.variantEscapeFraction.size() == result.variantNameToIndex.size());
-	assert(result.cellIsMatActive.size() == result.cellNameToIndex.size());
-	assert(result.cellEscapeFraction.size() == result.cellNameToIndex.size());
+	assert(result.variantIsMatRef.size() == helpers.variantNameToIndex.size());
+	assert(result.variantEscapeFraction.size() == helpers.variantNameToIndex.size());
+	assert(result.cellIsMatActive.size() == helpers.cellNameToIndex.size());
+	assert(result.cellEscapeFraction.size() == helpers.cellNameToIndex.size());
 	for (size_t variant = 0; variant < result.variantIsMatRef.size(); variant++)
 	{
 		result.variantIsMatRef[variant] = false;
@@ -756,7 +769,7 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 //	std::cerr << overlapBetweenForcedVariantsAndAllVariants << " overlap between forced variants and all variants" << std::endl;
 	size_t iteration = 0;
 	double logprob = getTotalLogProb(result, helpers);
-	std::unordered_set<size_t> ignoreTheseVariantsForNow = getIgnoredFirstStepVariants(result, secondStepRegions);
+	std::unordered_set<size_t> ignoreTheseVariantsForNow = getIgnoredFirstStepVariants(helpers, secondStepRegions);
 //	std::cerr << ignoreTheseVariantsForNow.size() << " variants ignored in first step" << std::endl;
 //	std::cerr << "initial non-normalized log likelihood sum " << logprob << std::endl;
 	while (true)
@@ -787,7 +800,7 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 	std::cerr << "final non-normalized log likelihood sum " << logprob << std::endl;
 }
 
-std::unordered_map<size_t, bool> readForcedVariantPhases(const std::string& filename, const EMResult& EMresult)
+std::unordered_map<size_t, bool> readForcedVariantPhases(const std::string& filename, const EMHelperVariables& helpers)
 {
 	std::unordered_map<size_t, bool> forcedVariants;
 	std::ifstream file { filename };
@@ -800,40 +813,27 @@ std::unordered_map<size_t, bool> readForcedVariantPhases(const std::string& file
 		std::string variant;
 		std::string origin;
 		sstr >> variant >> origin;
-		if (EMresult.variantNameToIndex.count(variant) == 0) continue;
+		if (helpers.variantNameToIndex.count(variant) == 0) continue;
 		if (origin == "mat")
 		{
-			forcedVariants[EMresult.variantNameToIndex.at(variant)] = true;
+			forcedVariants[helpers.variantNameToIndex.at(variant)] = true;
 		}
 		else
 		{
 			assert(origin == "pat");
-			forcedVariants[EMresult.variantNameToIndex.at(variant)] = false;
+			forcedVariants[helpers.variantNameToIndex.at(variant)] = false;
 		}
 	}
 	return forcedVariants;
 }
 
-EMResult initializeResult(const std::vector<CellMatch>& counts)
+EMResult initializeResult(const EMHelperVariables& helpers)
 {
 	EMResult result;
-	for (const auto& t : counts)
-	{
-		if (result.variantNameToIndex.count(t.variant) == 0)
-		{
-			size_t index = result.variantNameToIndex.size();
-			result.variantNameToIndex[t.variant] = index;
-		}
-		if (result.cellNameToIndex.count(t.cell) == 0)
-		{
-			size_t index = result.cellNameToIndex.size();
-			result.cellNameToIndex[t.cell] = index;
-		}
-	}
-	result.variantIsMatRef.resize(result.variantNameToIndex.size(), false);
-	result.variantEscapeFraction.resize(result.variantNameToIndex.size(), -1);
-	result.cellIsMatActive.resize(result.cellNameToIndex.size(), false);
-	result.cellEscapeFraction.resize(result.cellNameToIndex.size(), -1);
+	result.variantIsMatRef.resize(helpers.variantNameToIndex.size(), false);
+	result.variantEscapeFraction.resize(helpers.variantNameToIndex.size(), -1);
+	result.cellIsMatActive.resize(helpers.cellNameToIndex.size(), false);
+	result.cellEscapeFraction.resize(helpers.cellNameToIndex.size(), -1);
 	return result;
 }
 
@@ -912,23 +912,24 @@ int main(int argc, char** argv)
 	size_t numTries = std::stoull(argv[4]);
 	std::string annotationFile { argv[5] };
 	std::string secondStepGeneList { argv[6] };
-	std::cerr << "read match counts" << std::endl;
+//	std::cerr << "read match counts" << std::endl;
 	std::vector<CellMatch> counts = readMatchCounts(matchTableFile);
+//	std::cerr << "get helper variables" << std::endl;
+	EMHelperVariables helpers = getHelpers(counts);
+//	std::cerr << "read forced variant phases" << std::endl;
+	auto forcedPhases = readForcedVariantPhases(forcedPhaseFile, helpers);
+//	std::cerr << forcedPhases.size() << " forced variant phases" << std::endl;
 	std::vector<size_t> iterationsWithGoodScore;
 	double bestScore = -100000.0;
 	EMResult bestResult;
-	EMHelperVariables bestHelpers;
+//	std::cerr << "read second step genes" << std::endl;
 	std::vector<std::pair<size_t, size_t>> secondStepRegions = loadSecondStepRegions(annotationFile, secondStepGeneList);
+//	std::cerr << secondStepRegions.size() << " second step genes" << std::endl;
 	for (size_t iteration = 0; iteration < numTries; iteration++)
 	{
 		std::cerr << "bigiteration " << iteration << std::endl;
 //		std::cerr << "initialize" << std::endl;
-		EMResult result = initializeResult(counts);
-//		std::cerr << "read forced variant phases" << std::endl;
-		auto forcedPhases = readForcedVariantPhases(forcedPhaseFile, result);
-//		std::cerr << forcedPhases.size() << " forced variant phases" << std::endl;
-//		std::cerr << "get helper variables" << std::endl;
-		EMHelperVariables helpers = getHelpers(counts, result);
+		EMResult result = initializeResult(helpers);
 //		std::cerr << "run EM" << std::endl;
 		getMaximumLikelihoodEM(result, counts, forcedPhases, helpers, secondStepRegions, randomSeed+iteration);
 //		std::cerr << "write results" << std::endl;
@@ -937,9 +938,8 @@ int main(int argc, char** argv)
 		{
 			bestScore = score;
 			bestResult = result;
-			bestHelpers = helpers;
 		}
 	}
 	std::cerr << "best score " << bestScore << std::endl;
-	writeResult(bestResult, counts, bestHelpers, std::cout);
+	writeResult(bestResult, counts, helpers, std::cout);
 }
