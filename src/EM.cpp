@@ -205,7 +205,7 @@ double logprobDerivativeXe(const size_t n, const double cellCoverageFraction, co
 	return result;
 }
 
-double getCellLogProbDerivative(const EMResult& result, const EMHelperVariables& helpers, const size_t cell, const double Ce, const bool matActive, const std::unordered_set<size_t>& ignoreTheseVariantsForNow)
+double getCellLogProbDerivative(const EMResult& result, const EMHelperVariables& helpers, const size_t cell, const double Ce, const bool matActive, const std::vector<bool>& ignoreTheseVariantsForNow)
 {
 	double derivativeSum = 0;
 	const double f_j = helpers.cellCoverageFraction[cell];
@@ -213,7 +213,7 @@ double getCellLogProbDerivative(const EMResult& result, const EMHelperVariables&
 	assert(f_j <= 1.0 + epsilon);
 	for (const size_t variant : helpers.activeVariantsPerCell[cell])
 	{
-		if (ignoreTheseVariantsForNow.count(variant) == 1) continue;
+		if (ignoreTheseVariantsForNow[variant]) continue;
 		const size_t c_i = helpers.variantCoverage[variant];
 		const double Xe = result.variantEscapeFraction[variant];
 		assert(Xe >= escapeBoundary - epsilon);
@@ -234,7 +234,7 @@ double getCellLogProbDerivative(const EMResult& result, const EMHelperVariables&
 	return derivativeSum;
 }
 
-double getCellLogProb(const EMResult& result, const EMHelperVariables& helpers, const size_t cell, const double Ce, const bool matActive, const std::unordered_set<size_t>& ignoreTheseVariantsForNow)
+double getCellLogProb(const EMResult& result, const EMHelperVariables& helpers, const size_t cell, const double Ce, const bool matActive, const std::vector<bool>& ignoreTheseVariantsForNow)
 {
 	double logProbSum = 0;
 	const double f_j = helpers.cellCoverageFraction[cell];
@@ -242,7 +242,7 @@ double getCellLogProb(const EMResult& result, const EMHelperVariables& helpers, 
 	assert(f_j <= 1.0 + epsilon);
 	for (const size_t variant : helpers.activeVariantsPerCell[cell])
 	{
-		if (ignoreTheseVariantsForNow.count(variant) == 1) continue;
+		if (ignoreTheseVariantsForNow[variant]) continue;
 		const double Xe = result.variantEscapeFraction[variant];
 		assert(Xe >= escapeBoundary - epsilon);
 		assert(Xe <= maxEscape - escapeBoundary + epsilon);
@@ -261,12 +261,6 @@ double getCellLogProb(const EMResult& result, const EMHelperVariables& helpers, 
 		}
 	}
 	return logProbSum;
-}
-
-double getCellLogProb(const EMResult& result, const EMHelperVariables& helpers, const size_t cell, const double Ce, const bool matActive)
-{
-	std::unordered_set<size_t> empty;
-	return getCellLogProb(result, helpers, cell, Ce, matActive, empty);
 }
 
 double getVariantLogProbDerivative(const EMResult& result, const EMHelperVariables& helpers, const size_t variant, const double Xe, const bool matRef)
@@ -315,7 +309,7 @@ double getVariantLogProbs(const EMResult& result, const EMHelperVariables& helpe
 	return logProbSum;
 }
 
-double binarySearchOptimalCe(const EMResult& result, const EMHelperVariables& helpers, const size_t cell, const bool mat, const std::unordered_set<size_t>& ignoreTheseVariantsForNow)
+double binarySearchOptimalCe(const EMResult& result, const EMHelperVariables& helpers, const size_t cell, const bool mat, const std::vector<bool>& ignoreTheseVariantsForNow)
 {
 	double min = escapeBoundary;
 	double max = maxEscape - escapeBoundary;
@@ -349,17 +343,11 @@ double binarySearchOptimalCe(const EMResult& result, const EMHelperVariables& he
 	return Ce;
 }
 
-std::pair<double, double> getOptimalCellCe(const EMResult& result, const EMHelperVariables& helpers, const size_t cell, const std::unordered_set<size_t>& ignoreTheseVariantsForNow)
+std::pair<double, double> getOptimalCellCe(const EMResult& result, const EMHelperVariables& helpers, const size_t cell, const std::vector<bool>& ignoreTheseVariantsForNow)
 {
 	double matCe = binarySearchOptimalCe(result, helpers, cell, true, ignoreTheseVariantsForNow);
 	double patCe = binarySearchOptimalCe(result, helpers, cell, false, ignoreTheseVariantsForNow);
 	return std::make_pair(matCe, patCe);
-}
-
-std::pair<double, double> getOptimalCellCe(const EMResult& result, const EMHelperVariables& helpers, const size_t cell)
-{
-	std::unordered_set<size_t> empty;
-	return getOptimalCellCe(result, helpers, cell, empty);
 }
 
 double binarySearchOptimalXe(const EMResult& result, const EMHelperVariables& helpers, const size_t variant, const bool mat)
@@ -403,14 +391,14 @@ std::pair<double, double> getOptimalVariantXe(const EMResult& result, const EMHe
 	return std::make_pair(matXe, patXe);
 }
 
-bool maximizeVariantStates(EMResult& result, const std::unordered_map<size_t, bool>& forcedPhases, const EMHelperVariables& helpers, const std::unordered_set<size_t>& ignoreTheseVariantsForNow)
+bool maximizeVariantStates(EMResult& result, const std::unordered_map<size_t, bool>& forcedPhases, const EMHelperVariables& helpers, const std::vector<bool>& ignoreTheseVariantsForNow)
 {
 	bool changed = false;
 	size_t phasesChanged = 0;
 	size_t escapeChanged = 0;
 	for (size_t variant = 0; variant < result.variantIsMatRef.size(); variant++)
 	{
-		if (ignoreTheseVariantsForNow.count(variant) == 1) continue;
+		if (ignoreTheseVariantsForNow[variant]) continue;
 		double matXe = 0;
 		double patXe = 0;
 		std::tie(matXe, patXe) = getOptimalVariantXe(result, helpers, variant);
@@ -464,7 +452,7 @@ bool maximizeVariantStates(EMResult& result, const std::unordered_map<size_t, bo
 	return changed;
 }
 
-bool maximizeCellStates(EMResult& result, const EMHelperVariables& helpers, const std::unordered_set<size_t>& ignoreTheseVariantsForNow)
+bool maximizeCellStates(EMResult& result, const EMHelperVariables& helpers, const std::vector<bool>& ignoreTheseVariantsForNow)
 {
 	bool changed = false;
 	size_t cellsChanged = 0;
@@ -517,12 +505,12 @@ bool maximizeCellStates(EMResult& result, const EMHelperVariables& helpers, cons
 	return changed;
 }
 
-double getNonnormalizedTotalLogProb(const EMResult& result, const EMHelperVariables& helpers, const std::unordered_set<size_t>& ignoreTheseVariantsForNow)
+double getNonnormalizedTotalLogProb(const EMResult& result, const EMHelperVariables& helpers, const std::vector<bool>& ignoreTheseVariantsForNow)
 {
 	double total = 0;
 	for (size_t variant = 0; variant < result.variantIsMatRef.size(); variant++)
 	{
-		if (ignoreTheseVariantsForNow.count(variant) == 1) continue;
+		if (ignoreTheseVariantsForNow[variant]) continue;
 		const double Xe = result.variantEscapeFraction.at(variant);
 		const double c_i = helpers.variantCoverage.at(variant);
 		const bool variantIsMat = result.variantIsMatRef[variant];
@@ -540,14 +528,15 @@ double getNonnormalizedTotalLogProb(const EMResult& result, const EMHelperVariab
 	return total;
 }
 
-double getTotalLogProb(const EMResult& result, const EMHelperVariables& helpers, const std::unordered_set<size_t>& ignoreTheseVariantsForNow)
+double getTotalLogProb(const EMResult& result, const EMHelperVariables& helpers, const std::vector<bool>& ignoreTheseVariantsForNow)
 {
 	return getNonnormalizedTotalLogProb(result, helpers, ignoreTheseVariantsForNow);
 }
 
 double getTotalLogProb(const EMResult& result, const EMHelperVariables& helpers)
 {
-	std::unordered_set<size_t> empty;
+	std::vector<bool> empty;
+	empty.resize(helpers.variantNameToIndex.size(), false);
 	return getNonnormalizedTotalLogProb(result, helpers, empty);
 }
 
@@ -606,6 +595,8 @@ void writeResult(const EMResult& result, const std::vector<CellMatch>& cellMatch
 	std::vector<std::string> cellOrder = getCellOrder(helpers.cellNameToIndex);
 	std::unordered_map<std::string, size_t> variantCoverage;
 	std::unordered_map<std::string, size_t> cellCoverage;
+	std::vector<bool> ignoreNothing;
+	ignoreNothing.resize(helpers.variantNameToIndex.size(), false);
 	for (const auto& t : cellMatches)
 	{
 		variantCoverage[t.variant] += t.count;
@@ -628,11 +619,11 @@ void writeResult(const EMResult& result, const std::vector<CellMatch>& cellMatch
 		const size_t cellIndex = helpers.cellNameToIndex.at(cell);
 		const bool matActive = result.cellIsMatActive[cellIndex];
 		double matCe, patCe;
-		std::tie(matCe, patCe) = getOptimalCellCe(result, helpers, cellIndex);
-		double scoreDifference = getCellLogProb(result, helpers, cellIndex, matActive ? matCe : patCe, matActive);
-		scoreDifference -= getCellLogProb(result, helpers, cellIndex, matActive ? patCe : matCe, !matActive);
-		double escapeDifference = getCellLogProb(result, helpers, cellIndex, result.cellEscapeFraction[cellIndex], matActive);
-		escapeDifference -= getCellLogProb(result, helpers, cellIndex, cellEscapeBoundary, matActive);
+		std::tie(matCe, patCe) = getOptimalCellCe(result, helpers, cellIndex, ignoreNothing);
+		double scoreDifference = getCellLogProb(result, helpers, cellIndex, matActive ? matCe : patCe, matActive, ignoreNothing);
+		scoreDifference -= getCellLogProb(result, helpers, cellIndex, matActive ? patCe : matCe, !matActive, ignoreNothing);
+		double escapeDifference = getCellLogProb(result, helpers, cellIndex, result.cellEscapeFraction[cellIndex], matActive, ignoreNothing);
+		escapeDifference -= getCellLogProb(result, helpers, cellIndex, cellEscapeBoundary, matActive, ignoreNothing);
 		stream << cell << "\t" << (matActive ? "mat" : "pat") << "\t" << result.cellEscapeFraction[cellIndex] << "\t" << cellCoverage.at(cell) << "\t" << scoreDifference << "\t" << escapeDifference << std::endl;
 	}
 }
@@ -721,55 +712,26 @@ size_t parseVariantPosition(const std::string& name)
 	return 0;
 }
 
-std::unordered_set<size_t> getIgnoredFirstStepVariants(const EMHelperVariables& helpers, const std::vector<std::pair<size_t, size_t>>& secondStepRegions)
+std::vector<bool> getIgnoredSecondStepVariants(const EMHelperVariables& helpers, const std::vector<size_t>& secondStepVariants)
 {
-	if (secondStepRegions.size() == 0) return std::unordered_set<size_t> {};
-	std::unordered_set<size_t> ignored;
-	for (const auto& pair : helpers.variantNameToIndex)
+	std::vector<bool> ignored;
+	ignored.resize(helpers.variantNameToIndex.size(), false);
+	for (size_t variant : secondStepVariants)
 	{
-		size_t parsedPosition = parseVariantPosition(pair.first);
-		for (auto region : secondStepRegions)
-		{
-			if (region.first <= parsedPosition && region.second >= parsedPosition)
-			{
-				ignored.insert(pair.second);
-				break;
-			}
-		}
+		ignored[variant] = true;
 	}
 	return ignored;
 }
 
-void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cellMatches, const std::unordered_map<size_t, bool>& forcedPhases, const EMHelperVariables& helpers, const std::vector<std::pair<size_t, size_t>>& secondStepRegions, const size_t randomSeed)
+void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cellMatches, const std::unordered_map<size_t, bool>& forcedPhases, const EMHelperVariables& helpers, const std::vector<size_t>& secondStepVariants)
 {
-//	std::cerr << "initialize with random seed " << randomSeed << std::endl;
 	assert(result.variantIsMatRef.size() == helpers.variantNameToIndex.size());
 	assert(result.variantEscapeFraction.size() == helpers.variantNameToIndex.size());
 	assert(result.cellIsMatActive.size() == helpers.cellNameToIndex.size());
 	assert(result.cellEscapeFraction.size() == helpers.cellNameToIndex.size());
-	for (size_t variant = 0; variant < result.variantIsMatRef.size(); variant++)
-	{
-		result.variantIsMatRef[variant] = false;
-		result.variantEscapeFraction[variant] = -1;
-	}
-	for (size_t cell = 0; cell < result.cellIsMatActive.size(); cell++)
-	{
-		result.cellIsMatActive[cell] = false;
-		result.cellEscapeFraction[cell] = -1;
-	}
-	initializeRandomly(result, forcedPhases, randomSeed);
-	size_t overlapBetweenForcedVariantsAndAllVariants = 0;
-	for (size_t variant = 0; variant < result.variantIsMatRef.size(); variant++)
-	{
-		if (forcedPhases.count(variant) == 1)
-		{
-			overlapBetweenForcedVariantsAndAllVariants += 1;
-		}
-	}
-//	std::cerr << overlapBetweenForcedVariantsAndAllVariants << " overlap between forced variants and all variants" << std::endl;
 	size_t iteration = 0;
 	double logprob = getTotalLogProb(result, helpers);
-	std::unordered_set<size_t> ignoreTheseVariantsForNow = getIgnoredFirstStepVariants(helpers, secondStepRegions);
+	std::vector<bool> ignoreTheseVariantsForNow = getIgnoredSecondStepVariants(helpers, secondStepVariants);
 //	std::cerr << ignoreTheseVariantsForNow.size() << " variants ignored in first step" << std::endl;
 //	std::cerr << "initial non-normalized log likelihood sum " << logprob << std::endl;
 	while (true)
@@ -804,6 +766,7 @@ std::unordered_map<size_t, bool> readForcedVariantPhases(const std::string& file
 {
 	std::unordered_map<size_t, bool> forcedVariants;
 	std::ifstream file { filename };
+	size_t totalForcedVariants = 0;
 	while (file.good())
 	{
 		std::string line;
@@ -813,6 +776,7 @@ std::unordered_map<size_t, bool> readForcedVariantPhases(const std::string& file
 		std::string variant;
 		std::string origin;
 		sstr >> variant >> origin;
+		totalForcedVariants += 1;
 		if (helpers.variantNameToIndex.count(variant) == 0) continue;
 		if (origin == "mat")
 		{
@@ -824,6 +788,7 @@ std::unordered_map<size_t, bool> readForcedVariantPhases(const std::string& file
 			forcedVariants[helpers.variantNameToIndex.at(variant)] = false;
 		}
 	}
+//	std::cerr << "total forced variants " << totalForcedVariants << ", overlap with real variants " << forcedVariants.size() << std::endl;
 	return forcedVariants;
 }
 
@@ -904,6 +869,26 @@ std::vector<std::pair<size_t, size_t>> loadSecondStepRegions(const std::string& 
 	return result;
 }
 
+std::vector<size_t> loadSecondStepVariants(const std::string& annotationFile, const std::string& secondStepGeneList, const EMHelperVariables& helpers)
+{
+	auto regions = loadSecondStepRegions(annotationFile, secondStepGeneList);
+	std::vector<size_t> result;
+	if (regions.size() == 0) return result;
+	for (const auto& pair : helpers.variantNameToIndex)
+	{
+		size_t parsedPosition = parseVariantPosition(pair.first);
+		for (auto region : regions)
+		{
+			if (region.first <= parsedPosition && region.second >= parsedPosition)
+			{
+				result.emplace_back(pair.second);
+				break;
+			}
+		}
+	}
+	return result;
+}
+
 int main(int argc, char** argv)
 {
 	std::string matchTableFile { argv[1] };
@@ -918,20 +903,22 @@ int main(int argc, char** argv)
 	EMHelperVariables helpers = getHelpers(counts);
 //	std::cerr << "read forced variant phases" << std::endl;
 	auto forcedPhases = readForcedVariantPhases(forcedPhaseFile, helpers);
-//	std::cerr << forcedPhases.size() << " forced variant phases" << std::endl;
 	std::vector<size_t> iterationsWithGoodScore;
 	double bestScore = -100000.0;
 	EMResult bestResult;
 //	std::cerr << "read second step genes" << std::endl;
-	std::vector<std::pair<size_t, size_t>> secondStepRegions = loadSecondStepRegions(annotationFile, secondStepGeneList);
-//	std::cerr << secondStepRegions.size() << " second step genes" << std::endl;
+	std::vector<size_t> secondStepVariants = loadSecondStepVariants(annotationFile, secondStepGeneList, helpers);
+//	std::cerr << secondStepVariants.size() << " second step variants" << std::endl;
 	for (size_t iteration = 0; iteration < numTries; iteration++)
 	{
 		std::cerr << "bigiteration " << iteration << std::endl;
 //		std::cerr << "initialize" << std::endl;
 		EMResult result = initializeResult(helpers);
+		size_t randomSeedHere = randomSeed + iteration;
+//		std::cerr << "initialize with random seed " << randomSeedHere << std::endl;
+		initializeRandomly(result, forcedPhases, randomSeedHere);
 //		std::cerr << "run EM" << std::endl;
-		getMaximumLikelihoodEM(result, counts, forcedPhases, helpers, secondStepRegions, randomSeed+iteration);
+		getMaximumLikelihoodEM(result, counts, forcedPhases, helpers, secondStepVariants);
 //		std::cerr << "write results" << std::endl;
 		double score = getTotalLogProb(result, helpers);
 		if (iteration == 0 || score > bestScore)
