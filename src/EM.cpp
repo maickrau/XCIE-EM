@@ -15,6 +15,23 @@ const double maxEscape = 1.0;
 const double variantEscapeBoundary = 0.5;
 const double cellEscapeBoundary = 0.5;
 
+struct NoiseMaker
+{
+public:
+	double getNoise()
+	{
+		return magnitude * normalDistribution(generator);
+	}
+	void initializeSeed(const size_t seed)
+	{
+		generator = std::mt19937 { seed };
+	}
+	double magnitude;
+private:
+	std::mt19937 generator;
+	std::normal_distribution<> normalDistribution;
+};
+
 struct CellMatch
 {
 public:
@@ -391,7 +408,7 @@ std::pair<double, double> getOptimalVariantXe(const EMResult& result, const EMHe
 	return std::make_pair(matXe, patXe);
 }
 
-bool maximizeVariantStates(EMResult& result, const std::unordered_map<size_t, bool>& forcedPhases, const EMHelperVariables& helpers, const std::vector<bool>& ignoreTheseVariantsForNow)
+bool maximizeVariantStates(EMResult& result, const std::unordered_map<size_t, bool>& forcedPhases, const EMHelperVariables& helpers, const std::vector<bool>& ignoreTheseVariantsForNow, NoiseMaker& noise)
 {
 	bool changed = false;
 	size_t phasesChanged = 0;
@@ -404,8 +421,8 @@ bool maximizeVariantStates(EMResult& result, const std::unordered_map<size_t, bo
 		std::tie(matXe, patXe) = getOptimalVariantXe(result, helpers, variant);
 		if (forcedPhases.count(variant) == 0)
 		{
-			double matRefLogProbSum = getVariantLogProbs(result, helpers, variant, matXe, true);
-			double patRefLogProbSum = getVariantLogProbs(result, helpers, variant, patXe, false);
+			double matRefLogProbSum = getVariantLogProbs(result, helpers, variant, matXe, true) + noise.getNoise();
+			double patRefLogProbSum = getVariantLogProbs(result, helpers, variant, patXe, false) + noise.getNoise();
 			if (patRefLogProbSum > matRefLogProbSum + epsilon)
 			{
 				if (result.variantIsMatRef[variant])
@@ -452,7 +469,7 @@ bool maximizeVariantStates(EMResult& result, const std::unordered_map<size_t, bo
 	return changed;
 }
 
-bool maximizeCellStates(EMResult& result, const EMHelperVariables& helpers, const std::vector<bool>& ignoreTheseVariantsForNow)
+bool maximizeCellStates(EMResult& result, const EMHelperVariables& helpers, const std::vector<bool>& ignoreTheseVariantsForNow, NoiseMaker& noise)
 {
 	bool changed = false;
 	size_t cellsChanged = 0;
@@ -461,8 +478,8 @@ bool maximizeCellStates(EMResult& result, const EMHelperVariables& helpers, cons
 	{
 		double matCe, patCe;
 		std::tie(matCe, patCe) = getOptimalCellCe(result, helpers, cell, ignoreTheseVariantsForNow);
-		double matActiveLogProbSum = getCellLogProb(result, helpers, cell, matCe, true, ignoreTheseVariantsForNow);
-		double patActiveLogProbSum = getCellLogProb(result, helpers, cell, patCe, false, ignoreTheseVariantsForNow);
+		double matActiveLogProbSum = getCellLogProb(result, helpers, cell, matCe, true, ignoreTheseVariantsForNow) + noise.getNoise();
+		double patActiveLogProbSum = getCellLogProb(result, helpers, cell, patCe, false, ignoreTheseVariantsForNow) + noise.getNoise();
 		// should be strict comparison but add epsilon because of floating point rounding
 		if (matActiveLogProbSum > patActiveLogProbSum + epsilon)
 		{
@@ -723,7 +740,7 @@ std::vector<bool> getIgnoredSecondStepVariants(const EMHelperVariables& helpers,
 	return ignored;
 }
 
-void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cellMatches, const std::unordered_map<size_t, bool>& forcedPhases, const EMHelperVariables& helpers, const std::vector<size_t>& secondStepVariants)
+void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cellMatches, const std::unordered_map<size_t, bool>& forcedPhases, const EMHelperVariables& helpers, const std::vector<size_t>& secondStepVariants, const size_t noiseSeed, const double initialNoiseMagnitude, const double noiseDecay)
 {
 	assert(result.variantIsMatRef.size() == helpers.variantNameToIndex.size());
 	assert(result.variantEscapeFraction.size() == helpers.variantNameToIndex.size());
@@ -734,15 +751,18 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 	std::vector<bool> ignoreTheseVariantsForNow = getIgnoredSecondStepVariants(helpers, secondStepVariants);
 //	std::cerr << ignoreTheseVariantsForNow.size() << " variants ignored in first step" << std::endl;
 //	std::cerr << "initial non-normalized log likelihood sum " << logprob << std::endl;
+	NoiseMaker noise;
+	noise.initializeSeed(noiseSeed);
+	noise.magnitude = initialNoiseMagnitude;
 	while (true)
 	{
-		bool variantChanged = maximizeVariantStates(result, forcedPhases, helpers, ignoreTheseVariantsForNow);
+		bool variantChanged = maximizeVariantStates(result, forcedPhases, helpers, ignoreTheseVariantsForNow, noise);
 		if (variantChanged)
 		{
 			logprob = getTotalLogProb(result, helpers, ignoreTheseVariantsForNow);
 //			std::cerr << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
 		}
-		bool cellChanged = maximizeCellStates(result, helpers, ignoreTheseVariantsForNow);
+		bool cellChanged = maximizeCellStates(result, helpers, ignoreTheseVariantsForNow, noise);
 		if (cellChanged)
 		{
 			logprob = getTotalLogProb(result, helpers, ignoreTheseVariantsForNow);
@@ -751,12 +771,22 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 		iteration += 1;
 		if (!cellChanged && !variantChanged)
 		{
-			if (ignoreTheseVariantsForNow.size() == 0) break;
+			if (ignoreTheseVariantsForNow.size() == 0)
+			{
+				if (noise.magnitude == 0)
+				{
+					break;
+				}
+				noise.magnitude = 0;
+				continue;
+			}
 			ignoreTheseVariantsForNow.clear();
+
 //			std::cerr << "switch to second step" << std::endl;
 //			logprob = getTotalLogProb(result, helpers, ignoreTheseVariantsForNow);
 //			std::cerr << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
 		}
+		noise.magnitude *= noiseDecay;
 	}
 	logprob = getTotalLogProb(result, helpers);
 	std::cerr << "final non-normalized log likelihood sum " << logprob << std::endl;
@@ -897,6 +927,8 @@ int main(int argc, char** argv)
 	size_t numTries = std::stoull(argv[4]);
 	std::string annotationFile { argv[5] };
 	std::string secondStepGeneList { argv[6] };
+	double initialNoiseMagnitude = std::stod(argv[7]);
+	double noiseDecay = std::stod(argv[8]);
 //	std::cerr << "read match counts" << std::endl;
 	std::vector<CellMatch> counts = readMatchCounts(matchTableFile);
 //	std::cerr << "get helper variables" << std::endl;
@@ -918,7 +950,7 @@ int main(int argc, char** argv)
 //		std::cerr << "initialize with random seed " << randomSeedHere << std::endl;
 		initializeRandomly(result, forcedPhases, randomSeedHere);
 //		std::cerr << "run EM" << std::endl;
-		getMaximumLikelihoodEM(result, counts, forcedPhases, helpers, secondStepVariants);
+		getMaximumLikelihoodEM(result, counts, forcedPhases, helpers, secondStepVariants, randomSeedHere, initialNoiseMagnitude, noiseDecay);
 //		std::cerr << "write results" << std::endl;
 		double score = getTotalLogProb(result, helpers);
 		if (iteration == 0 || score > bestScore)
