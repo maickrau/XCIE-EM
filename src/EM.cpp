@@ -15,6 +15,8 @@ const double variantEscapeBoundary = 0.5;
 const double cellEscapeBoundary = 0.5;
 const double inactiveExpressedPenalty = 3.0; // penalty for expressing inactive chrX more than active. only Xist should express inactive more than active. 3 corresponds to prior prob ~5%.
 
+const size_t binarySearchRounds = 12;
+
 struct NoiseMaker
 {
 public:
@@ -339,7 +341,7 @@ double binarySearchOptimalCe(const EMResult& result, const EMHelperVariables& he
 	double min = escapeBoundary;
 	double max = 1.0 - escapeBoundary;
 	// find derivative zero
-	for (size_t i = 0; i < 10; i++)
+	for (size_t i = 0; i < binarySearchRounds; i++)
 	{
 		double mid = (min+max) / 2.0;
 		double derivativeHere = getCellLogProbDerivative(result, helpers, cell, mid, mat, ignoreTheseVariantsForNow);
@@ -380,7 +382,7 @@ double binarySearchOptimalXe(const EMResult& result, const EMHelperVariables& he
 	double min = escapeBoundary;
 	double max = maxEscape - escapeBoundary;
 	// find derivative zero
-	for (size_t i = 0; i < 10; i++)
+	for (size_t i = 0; i < binarySearchRounds; i++)
 	{
 		double mid = (min+max) / 2.0;
 		double derivativeHere = getVariantLogProbDerivative(result, helpers, variant, mid, mat);
@@ -974,12 +976,15 @@ void addUnphasedVariantsToIndividualPhaseBlocks(EMHelperVariables& helpers)
 			presentInPhaseBlock[variant] = true;
 		}
 	}
+	size_t countAdded = 0;
 	for (size_t i = 0; i < presentInPhaseBlock.size(); i++)
 	{
 		if (presentInPhaseBlock[i]) continue;
 		helpers.phaseBlocks.emplace_back();
 		helpers.phaseBlocks.back().emplace_back(i, false);
+		countAdded += 1;
 	}
+	std::cerr << countAdded << " variants without phase blocks" << std::endl;
 }
 
 std::vector<std::string> split(const std::string& str, const char separator)
@@ -1054,17 +1059,19 @@ std::vector<std::vector<std::pair<size_t, bool>>> readVCFPhaseBlocks(const EMHel
 		assert(phaseBlockRenaming.count(pair.second) == 1);
 		result[phaseBlockRenaming.at(pair.second)].emplace_back(pair.first, variantPhaseAllele.at(pair.first));
 	}
+	std::cerr << result.size() << " phase blocks with " << variantPhaseBlock.size() << " variants" << std::endl;
 	return result;
 }
 
-std::vector<std::pair<size_t, bool>> parsePhaseBlocks(const std::vector<std::vector<std::pair<size_t, bool>>>& parsePhaseBlocks)
+std::vector<std::pair<size_t, bool>> parsePhaseBlocks(const EMHelperVariables& helpers, const std::vector<std::vector<std::pair<size_t, bool>>>& parsePhaseBlocks)
 {
 	std::vector<std::pair<size_t, bool>> result;
+	result.resize(helpers.variantNameToIndex.size(), std::make_pair(std::numeric_limits<size_t>::max(), true));
 	for (size_t i = 0; i < parsePhaseBlocks.size(); i++)
 	{
 		for (const auto& pair : parsePhaseBlocks[i])
 		{
-			while (result.size() < pair.first) result.emplace_back(std::numeric_limits<size_t>::max(), true);
+			assert(pair.first < result.size());
 			result[pair.first] = std::make_pair(i, pair.second);
 		}
 	}
@@ -1079,7 +1086,7 @@ void readReadPhasing(EMHelperVariables& helpers, const std::string phasingVCF)
 {
 	helpers.phaseBlocks = readVCFPhaseBlocks(helpers, phasingVCF);
 	addUnphasedVariantsToIndividualPhaseBlocks(helpers);
-	helpers.variantPhaseBlock = parsePhaseBlocks(helpers.phaseBlocks);
+	helpers.variantPhaseBlock = parsePhaseBlocks(helpers, helpers.phaseBlocks);
 }
 
 int main(int argc, char** argv)
