@@ -606,6 +606,50 @@ std::vector<std::string> getCellOrder(const std::unordered_map<std::string, size
 	return result;
 }
 
+void writeResultOnlyNonescapeVariants(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, std::ostream& stream)
+{
+	std::vector<std::string> variantOrder = getVariantOrder(helpers.variantNameToIndex);
+	std::vector<std::string> cellOrder = getCellOrder(helpers.cellNameToIndex);
+	std::unordered_map<std::string, size_t> variantCoverage;
+	std::unordered_map<std::string, size_t> cellCoverage;
+	std::vector<bool> ignoreEscapeVariants;
+	ignoreEscapeVariants.resize(helpers.variantNameToIndex.size(), false);
+	for (size_t i = 0 ; i < result.variantEscapeFraction.size(); i++)
+	{
+		if (result.variantEscapeFraction[i] <= escapeBoundary + epsilon) continue;
+		ignoreEscapeVariants[i] = true;
+	}
+	for (const auto& t : cellMatches)
+	{
+		variantCoverage[t.variant] += t.count;
+		cellCoverage[t.cell] += t.count;
+	}
+	for (const std::string& variant : variantOrder)
+	{
+		const size_t variantIndex = helpers.variantNameToIndex.at(variant);
+		const bool matRef = result.variantIsMatRef[variantIndex];
+		double matXe, patXe;
+		std::tie(matXe, patXe) = getOptimalVariantXe(result, helpers, variantIndex);
+		double phaseScoreDifference = getVariantLogProbs(result, helpers, variantIndex, matRef ? matXe : patXe, matRef);
+		phaseScoreDifference -= getVariantLogProbs(result, helpers, variantIndex, matRef ? patXe : matXe, !matRef);
+		double escapeDifference = getVariantLogProbs(result, helpers, variantIndex, result.variantEscapeFraction.at(variantIndex), matRef);
+		escapeDifference -= getVariantLogProbs(result, helpers, variantIndex, variantEscapeBoundary, matRef);
+		stream << variant << "\t" << (matRef ? "mat" : "pat") << "\t" << result.variantEscapeFraction[variantIndex] << "\t" << variantCoverage.at(variant) << "\t" << phaseScoreDifference << "\t" << escapeDifference << std::endl;
+	}
+	for (const std::string& cell : cellOrder)
+	{
+		const size_t cellIndex = helpers.cellNameToIndex.at(cell);
+		const bool matActive = result.cellIsMatActive[cellIndex];
+		double matCe, patCe;
+		std::tie(matCe, patCe) = getOptimalCellCe(result, helpers, cellIndex, ignoreEscapeVariants);
+		double scoreDifference = getCellLogProb(result, helpers, cellIndex, matActive ? matCe : patCe, matActive, ignoreEscapeVariants);
+		scoreDifference -= getCellLogProb(result, helpers, cellIndex, matActive ? patCe : matCe, !matActive, ignoreEscapeVariants);
+		double escapeDifference = getCellLogProb(result, helpers, cellIndex, result.cellEscapeFraction[cellIndex], matActive, ignoreEscapeVariants);
+		escapeDifference -= getCellLogProb(result, helpers, cellIndex, cellEscapeBoundary, matActive, ignoreEscapeVariants);
+		stream << cell << "\t" << (matActive ? "mat" : "pat") << "\t" << result.cellEscapeFraction[cellIndex] << "\t" << cellCoverage.at(cell) << "\t" << scoreDifference << "\t" << escapeDifference << std::endl;
+	}
+}
+
 void writeResult(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, std::ostream& stream)
 {
 	std::vector<std::string> variantOrder = getVariantOrder(helpers.variantNameToIndex);
@@ -961,4 +1005,8 @@ int main(int argc, char** argv)
 	}
 	std::cerr << "best score " << bestScore << std::endl;
 	writeResult(bestResult, counts, helpers, std::cout);
+	{
+		std::ofstream file { "result_noescapevariant.txt" };
+		writeResultOnlyNonescapeVariants(bestResult, counts, helpers, file);
+	}
 }
