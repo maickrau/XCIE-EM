@@ -69,7 +69,7 @@ public:
 	{
 		size_t block = helpers.variantPhaseBlock[variant].first;
 		size_t allele = helpers.variantPhaseBlock[variant].second;
-		return ~(phaseBlockIsHap1Mat[block] ^ allele);
+		return (phaseBlockIsHap1Mat[block] ^ allele);
 	}
 };
 
@@ -505,7 +505,7 @@ bool maximizeVariantStates(EMResult& result, const std::unordered_map<size_t, bo
 			}
 		}
 	}
-//	std::cerr << phasesChanged << " variant phases changed, " << escapeChanged << " variant escapes changed" << std::endl;
+	std::cerr << phasesChanged << " variant phases changed, " << escapeChanged << " variant escapes changed" << std::endl;
 	return changed;
 }
 
@@ -558,7 +558,7 @@ bool maximizeCellStates(EMResult& result, const EMHelperVariables& helpers, cons
 			result.cellEscapeFraction[cell] = patCe;
 		}
 	}
-//	std::cerr << cellsChanged << " cell actives changed, " << escapeChanged << " cell escapes changed" << std::endl;
+	std::cerr << cellsChanged << " cell actives changed, " << escapeChanged << " cell escapes changed" << std::endl;
 	return changed;
 }
 
@@ -793,7 +793,7 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 	double logprob = getTotalLogProb(result, helpers);
 	std::vector<bool> ignoreTheseVariantsForNow = getIgnoredSecondStepVariants(helpers, secondStepVariants);
 //	std::cerr << ignoreTheseVariantsForNow.size() << " variants ignored in first step" << std::endl;
-//	std::cerr << "initial non-normalized log likelihood sum " << logprob << std::endl;
+	std::cerr << "initial non-normalized log likelihood sum " << logprob << std::endl;
 	NoiseMaker noise;
 	noise.initializeSeed(noiseSeed);
 	noise.magnitude = initialNoiseMagnitude;
@@ -803,13 +803,13 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 		if (variantChanged)
 		{
 			logprob = getTotalLogProb(result, helpers, ignoreTheseVariantsForNow);
-//			std::cerr << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
+			std::cerr << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
 		}
 		bool cellChanged = maximizeCellStates(result, helpers, ignoreTheseVariantsForNow, noise);
 		if (cellChanged)
 		{
 			logprob = getTotalLogProb(result, helpers, ignoreTheseVariantsForNow);
-//			std::cerr << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
+			std::cerr << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
 		}
 		iteration += 1;
 		if (!cellChanged && !variantChanged)
@@ -827,7 +827,7 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 
 //			std::cerr << "switch to second step" << std::endl;
 //			logprob = getTotalLogProb(result, helpers, ignoreTheseVariantsForNow);
-//			std::cerr << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
+			std::cerr << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
 		}
 		noise.magnitude *= noiseDecay;
 	}
@@ -981,7 +981,7 @@ void addUnphasedVariantsToIndividualPhaseBlocks(EMHelperVariables& helpers)
 	{
 		if (presentInPhaseBlock[i]) continue;
 		helpers.phaseBlocks.emplace_back();
-		helpers.phaseBlocks.back().emplace_back(i, false);
+		helpers.phaseBlocks.back().emplace_back(i, i % 2 == 0);
 		countAdded += 1;
 	}
 	std::cerr << countAdded << " variants without phase blocks" << std::endl;
@@ -1005,7 +1005,7 @@ std::vector<std::vector<std::pair<size_t, bool>>> readVCFPhaseBlocks(const EMHel
 {
 	std::ifstream file { phasingVCF };
 	std::unordered_map<size_t, size_t> variantPhaseBlock;
-	std::unordered_map<size_t, bool> variantPhaseAllele;
+	std::unordered_map<size_t, bool> variantFirstHapIsAlt;
 	while (file.good())
 	{
 		std::string line;
@@ -1037,12 +1037,12 @@ std::vector<std::vector<std::pair<size_t, bool>>> readVCFPhaseBlocks(const EMHel
 		if (genotype != "0|1" && genotype != "1|0") continue;
 		size_t phaseBlock = std::numeric_limits<size_t>::max();
 		phaseBlock = std::stoull(values[phaseBlockIndex]);
-		bool phaseAllele = genotype[0] == '1';
+		bool firstHapIsAlt = genotype[0] == '1';
 		std::string variantName = "X:" + parts[1] + ":" + parts[3] + ":" + parts[4];
 		if (helpers.variantNameToIndex.count(variantName) == 0) continue;
 		size_t variantIndex = helpers.variantNameToIndex.at(variantName);
 		variantPhaseBlock[variantIndex] = phaseBlock;
-		variantPhaseAllele[variantIndex] = phaseAllele;
+		variantFirstHapIsAlt[variantIndex] = firstHapIsAlt;
 	}
 	std::unordered_map<size_t, size_t> phaseBlockRenaming;
 	for (const auto& pair : variantPhaseBlock)
@@ -1055,9 +1055,9 @@ std::vector<std::vector<std::pair<size_t, bool>>> readVCFPhaseBlocks(const EMHel
 	result.resize(phaseBlockRenaming.size());
 	for (const auto& pair : variantPhaseBlock)
 	{
-		assert(variantPhaseAllele.count(pair.first) == 1);
+		assert(variantFirstHapIsAlt.count(pair.first) == 1);
 		assert(phaseBlockRenaming.count(pair.second) == 1);
-		result[phaseBlockRenaming.at(pair.second)].emplace_back(pair.first, variantPhaseAllele.at(pair.first));
+		result[phaseBlockRenaming.at(pair.second)].emplace_back(pair.first, variantFirstHapIsAlt.at(pair.first));
 	}
 	std::cerr << result.size() << " phase blocks with " << variantPhaseBlock.size() << " variants" << std::endl;
 	return result;
