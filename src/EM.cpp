@@ -12,8 +12,6 @@
 const double epsilon = 0.0001; // comparisons should be strict but add an epsilon because of float rounding issues
 const double escapeBoundary = 0.001; // bounds X-chromosome inactivation escape to 0+this .. 1-this
 const double maxEscape = 1.0;
-const double variantEscapeBoundary = 0.5;
-const double cellEscapeBoundary = 0.5;
 
 struct NoiseMaker
 {
@@ -632,9 +630,7 @@ void writeResultOnlyNonescapeVariants(const EMResult& result, const std::vector<
 		std::tie(matXe, patXe) = getOptimalVariantXe(result, helpers, variantIndex);
 		double phaseScoreDifference = getVariantLogProbs(result, helpers, variantIndex, matRef ? matXe : patXe, matRef);
 		phaseScoreDifference -= getVariantLogProbs(result, helpers, variantIndex, matRef ? patXe : matXe, !matRef);
-		double escapeDifference = getVariantLogProbs(result, helpers, variantIndex, result.variantEscapeFraction.at(variantIndex), matRef);
-		escapeDifference -= getVariantLogProbs(result, helpers, variantIndex, variantEscapeBoundary, matRef);
-		stream << variant << "\t" << (matRef ? "mat" : "pat") << "\t" << result.variantEscapeFraction[variantIndex] << "\t" << variantCoverage.at(variant) << "\t" << phaseScoreDifference << "\t" << escapeDifference << std::endl;
+		stream << variant << "\t" << (matRef ? "mat" : "pat") << "\t" << result.variantEscapeFraction[variantIndex] << "\t" << variantCoverage.at(variant) << "\t" << phaseScoreDifference << std::endl;
 	}
 	for (const std::string& cell : cellOrder)
 	{
@@ -644,9 +640,7 @@ void writeResultOnlyNonescapeVariants(const EMResult& result, const std::vector<
 		std::tie(matCe, patCe) = getOptimalCellCe(result, helpers, cellIndex, ignoreEscapeVariants);
 		double scoreDifference = getCellLogProb(result, helpers, cellIndex, matActive ? matCe : patCe, matActive, ignoreEscapeVariants);
 		scoreDifference -= getCellLogProb(result, helpers, cellIndex, matActive ? patCe : matCe, !matActive, ignoreEscapeVariants);
-		double escapeDifference = getCellLogProb(result, helpers, cellIndex, result.cellEscapeFraction[cellIndex], matActive, ignoreEscapeVariants);
-		escapeDifference -= getCellLogProb(result, helpers, cellIndex, cellEscapeBoundary, matActive, ignoreEscapeVariants);
-		stream << cell << "\t" << (matActive ? "mat" : "pat") << "\t" << result.cellEscapeFraction[cellIndex] << "\t" << cellCoverage.at(cell) << "\t" << scoreDifference << "\t" << escapeDifference << std::endl;
+		stream << cell << "\t" << (matActive ? "mat" : "pat") << "\t" << result.cellEscapeFraction[cellIndex] << "\t" << cellCoverage.at(cell) << "\t" << scoreDifference << std::endl;
 	}
 }
 
@@ -671,9 +665,7 @@ void writeResult(const EMResult& result, const std::vector<CellMatch>& cellMatch
 		std::tie(matXe, patXe) = getOptimalVariantXe(result, helpers, variantIndex);
 		double phaseScoreDifference = getVariantLogProbs(result, helpers, variantIndex, matRef ? matXe : patXe, matRef);
 		phaseScoreDifference -= getVariantLogProbs(result, helpers, variantIndex, matRef ? patXe : matXe, !matRef);
-		double escapeDifference = getVariantLogProbs(result, helpers, variantIndex, result.variantEscapeFraction.at(variantIndex), matRef);
-		escapeDifference -= getVariantLogProbs(result, helpers, variantIndex, variantEscapeBoundary, matRef);
-		stream << variant << "\t" << (matRef ? "mat" : "pat") << "\t" << result.variantEscapeFraction[variantIndex] << "\t" << variantCoverage.at(variant) << "\t" << phaseScoreDifference << "\t" << escapeDifference << std::endl;
+		stream << variant << "\t" << (matRef ? "mat" : "pat") << "\t" << result.variantEscapeFraction[variantIndex] << "\t" << variantCoverage.at(variant) << "\t" << phaseScoreDifference << std::endl;
 	}
 	for (const std::string& cell : cellOrder)
 	{
@@ -683,9 +675,7 @@ void writeResult(const EMResult& result, const std::vector<CellMatch>& cellMatch
 		std::tie(matCe, patCe) = getOptimalCellCe(result, helpers, cellIndex, ignoreNothing);
 		double scoreDifference = getCellLogProb(result, helpers, cellIndex, matActive ? matCe : patCe, matActive, ignoreNothing);
 		scoreDifference -= getCellLogProb(result, helpers, cellIndex, matActive ? patCe : matCe, !matActive, ignoreNothing);
-		double escapeDifference = getCellLogProb(result, helpers, cellIndex, result.cellEscapeFraction[cellIndex], matActive, ignoreNothing);
-		escapeDifference -= getCellLogProb(result, helpers, cellIndex, cellEscapeBoundary, matActive, ignoreNothing);
-		stream << cell << "\t" << (matActive ? "mat" : "pat") << "\t" << result.cellEscapeFraction[cellIndex] << "\t" << cellCoverage.at(cell) << "\t" << scoreDifference << "\t" << escapeDifference << std::endl;
+		stream << cell << "\t" << (matActive ? "mat" : "pat") << "\t" << result.cellEscapeFraction[cellIndex] << "\t" << cellCoverage.at(cell) << "\t" << scoreDifference << std::endl;
 	}
 }
 
