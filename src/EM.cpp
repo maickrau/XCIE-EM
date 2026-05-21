@@ -604,6 +604,64 @@ std::vector<std::string> getCellOrder(const std::unordered_map<std::string, size
 	return result;
 }
 
+std::pair<double, double> getVariantEscapeConfidenceInterval(const EMResult& result, const EMHelperVariables& helpers, const size_t variantIndex, const double escapePointEstimate, const bool matRef, const double confidenceIntervalWidth)
+{
+	double wantedScoreDifference = log((1.0-confidenceIntervalWidth)/2.0);
+	double pointEstimateLogProb = getVariantLogProbs(result, helpers, variantIndex, escapePointEstimate, matRef);
+	double minResult = escapeBoundary;
+	double maxResult = maxEscape - escapeBoundary;
+	for (int delta = 0; delta < 1000 && escapePointEstimate+(double)delta*0.001 < maxEscape-escapeBoundary; delta++)
+	{
+		double escape = escapePointEstimate + (double)delta * 0.001;
+		double estimateHere = getVariantLogProbs(result, helpers, variantIndex, escape, matRef);
+		if (estimateHere <= pointEstimateLogProb + wantedScoreDifference)
+		{
+			maxResult = escape;
+			break;
+		}
+	}
+	for (int delta = 0; delta < 1000 && escapePointEstimate-(double)delta*0.001 > escapeBoundary; delta++)
+	{
+		double escape = escapePointEstimate - (double)delta * 0.001;
+		double estimateHere = getVariantLogProbs(result, helpers, variantIndex, escape, matRef);
+		if (estimateHere <= pointEstimateLogProb + wantedScoreDifference)
+		{
+			minResult = escape;
+			break;
+		}
+	}
+	return std::make_pair(minResult, maxResult);
+}
+
+std::pair<double, double> getCellEscapeConfidenceInterval(const EMResult& result, const EMHelperVariables& helpers, const size_t cellIndex, const double escapePointEstimate, const bool matActive, const double confidenceIntervalWidth, const std::vector<bool>& ignoreTheseVariantsForNow)
+{
+	double wantedScoreDifference = log((1.0-confidenceIntervalWidth)/2.0);
+	double pointEstimateLogProb = getCellLogProb(result, helpers, cellIndex, escapePointEstimate, matActive, ignoreTheseVariantsForNow);
+	double minResult = escapeBoundary;
+	double maxResult = maxEscape - escapeBoundary;
+	for (int delta = 0; delta < 1000 && escapePointEstimate+(double)delta*0.001 < maxEscape-escapeBoundary; delta++)
+	{
+		double escape = escapePointEstimate + (double)delta * 0.001;
+		double estimateHere = getCellLogProb(result, helpers, cellIndex, escape, matActive, ignoreTheseVariantsForNow);
+		if (estimateHere <= pointEstimateLogProb + wantedScoreDifference)
+		{
+			maxResult = escape;
+			break;
+		}
+	}
+	for (int delta = 0; delta < 1000 && escapePointEstimate-(double)delta*0.001 > escapeBoundary; delta++)
+	{
+		double escape = escapePointEstimate - (double)delta * 0.001;
+		double estimateHere = getCellLogProb(result, helpers, cellIndex, escape, matActive, ignoreTheseVariantsForNow);
+		if (estimateHere <= pointEstimateLogProb + wantedScoreDifference)
+		{
+			minResult = escape;
+			break;
+		}
+	}
+	return std::make_pair(minResult, maxResult);
+}
+
 void writeResultOnlyNonescapeVariants(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, std::ostream& stream)
 {
 	std::vector<std::string> variantOrder = getVariantOrder(helpers.variantNameToIndex);
@@ -630,7 +688,9 @@ void writeResultOnlyNonescapeVariants(const EMResult& result, const std::vector<
 		std::tie(matXe, patXe) = getOptimalVariantXe(result, helpers, variantIndex);
 		double phaseScoreDifference = getVariantLogProbs(result, helpers, variantIndex, matRef ? matXe : patXe, matRef);
 		phaseScoreDifference -= getVariantLogProbs(result, helpers, variantIndex, matRef ? patXe : matXe, !matRef);
-		stream << variant << "\t" << (matRef ? "mat" : "pat") << "\t" << result.variantEscapeFraction[variantIndex] << "\t" << variantCoverage.at(variant) << "\t" << phaseScoreDifference << std::endl;
+		double escapeConfidenceIntervalMin, escapeConfidenceIntervalMax;
+		std::tie(escapeConfidenceIntervalMin, escapeConfidenceIntervalMax) = getVariantEscapeConfidenceInterval(result, helpers, variantIndex, matRef ? matXe : patXe, matRef, 0.95);
+		stream << variant << "\t" << variantCoverage.at(variant) << "\t" <<  (matRef ? "mat" : "pat") << "\t" << phaseScoreDifference << "\t" << result.variantEscapeFraction[variantIndex] << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << std::endl;
 	}
 	for (const std::string& cell : cellOrder)
 	{
@@ -640,7 +700,9 @@ void writeResultOnlyNonescapeVariants(const EMResult& result, const std::vector<
 		std::tie(matCe, patCe) = getOptimalCellCe(result, helpers, cellIndex, ignoreEscapeVariants);
 		double scoreDifference = getCellLogProb(result, helpers, cellIndex, matActive ? matCe : patCe, matActive, ignoreEscapeVariants);
 		scoreDifference -= getCellLogProb(result, helpers, cellIndex, matActive ? patCe : matCe, !matActive, ignoreEscapeVariants);
-		stream << cell << "\t" << (matActive ? "mat" : "pat") << "\t" << result.cellEscapeFraction[cellIndex] << "\t" << cellCoverage.at(cell) << "\t" << scoreDifference << std::endl;
+		double escapeConfidenceIntervalMin, escapeConfidenceIntervalMax;
+		std::tie(escapeConfidenceIntervalMin, escapeConfidenceIntervalMax) = getCellEscapeConfidenceInterval(result, helpers, cellIndex, matActive ? matCe : patCe, matActive, 0.95, ignoreEscapeVariants);
+		stream << cell << "\t" << cellCoverage.at(cell) << "\t" << (matActive ? "mat" : "pat") << "\t" << scoreDifference << "\t" << result.cellEscapeFraction[cellIndex] << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << std::endl;
 	}
 }
 
@@ -665,7 +727,9 @@ void writeResult(const EMResult& result, const std::vector<CellMatch>& cellMatch
 		std::tie(matXe, patXe) = getOptimalVariantXe(result, helpers, variantIndex);
 		double phaseScoreDifference = getVariantLogProbs(result, helpers, variantIndex, matRef ? matXe : patXe, matRef);
 		phaseScoreDifference -= getVariantLogProbs(result, helpers, variantIndex, matRef ? patXe : matXe, !matRef);
-		stream << variant << "\t" << (matRef ? "mat" : "pat") << "\t" << result.variantEscapeFraction[variantIndex] << "\t" << variantCoverage.at(variant) << "\t" << phaseScoreDifference << std::endl;
+		double escapeConfidenceIntervalMin, escapeConfidenceIntervalMax;
+		std::tie(escapeConfidenceIntervalMin, escapeConfidenceIntervalMax) = getVariantEscapeConfidenceInterval(result, helpers, variantIndex, matRef ? matXe : patXe, matRef, 0.95);
+		stream << variant << "\t" << variantCoverage.at(variant) << "\t" <<  (matRef ? "mat" : "pat") << "\t" << phaseScoreDifference << "\t" << result.variantEscapeFraction[variantIndex] << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << std::endl;
 	}
 	for (const std::string& cell : cellOrder)
 	{
@@ -675,7 +739,9 @@ void writeResult(const EMResult& result, const std::vector<CellMatch>& cellMatch
 		std::tie(matCe, patCe) = getOptimalCellCe(result, helpers, cellIndex, ignoreNothing);
 		double scoreDifference = getCellLogProb(result, helpers, cellIndex, matActive ? matCe : patCe, matActive, ignoreNothing);
 		scoreDifference -= getCellLogProb(result, helpers, cellIndex, matActive ? patCe : matCe, !matActive, ignoreNothing);
-		stream << cell << "\t" << (matActive ? "mat" : "pat") << "\t" << result.cellEscapeFraction[cellIndex] << "\t" << cellCoverage.at(cell) << "\t" << scoreDifference << std::endl;
+		double escapeConfidenceIntervalMin, escapeConfidenceIntervalMax;
+		std::tie(escapeConfidenceIntervalMin, escapeConfidenceIntervalMax) = getCellEscapeConfidenceInterval(result, helpers, cellIndex, matActive ? matCe : patCe, matActive, 0.95, ignoreNothing);
+		stream << cell << "\t" << cellCoverage.at(cell) << "\t" << (matActive ? "mat" : "pat") << "\t" << scoreDifference << "\t" << result.cellEscapeFraction[cellIndex] << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << std::endl;
 	}
 }
 
