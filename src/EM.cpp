@@ -1258,15 +1258,26 @@ int main(int argc, char** argv)
 		("input-preprocessed-table", "Input prerocessed table of cell/variant matches", cxxopts::value<std::string>())
 		("o,out", "Output prefix", cxxopts::value<std::string>()->default_value("./result"))
 		("force-phase", "File with pre-phased trio variants", cxxopts::value<std::string>())
-		("noise-magnitude", "initial EM noise magnitude", cxxopts::value<double>()->default_value("20"))
-		("noise-decay", "EM noise decay", cxxopts::value<double>()->default_value("0.95"))
-		("random-seed", "Random seed for EM initialization", cxxopts::value<size_t>()->default_value("1"))
-		("num-runs", "Number of runs for EM", cxxopts::value<size_t>()->default_value("10"))
-		("exclude-region", "Exclude regions from EM", cxxopts::value<std::vector<std::string>>())
-		("exclude-grch38-PAR-XIST", "Exclude the PAR and XIST regions in grch38 coordinates. Equivalent to \"--exclude-region chrX:0-3500000 --exclude-region chrX:73817774-73852753\"")
-		("exclude-grch37-PAR-XIST", "Exclude the PAR and XIST regions in grch37 coordinates. Equivalent to \"--exclude-region chrX:0-3500000 --exclude-region chrX:73040486-73072588\"")
+		("EM-noise-magnitude", "initial EM noise magnitude", cxxopts::value<double>()->default_value("20"))
+		("EM-noise-decay", "EM noise decay", cxxopts::value<double>()->default_value("0.95"))
+		("EM-random-seed", "Random seed for EM initialization", cxxopts::value<size_t>()->default_value("1"))
+		("EM-num-runs", "Number of runs for EM", cxxopts::value<size_t>()->default_value("10"))
+		("exclude-region", "Exclude regions", cxxopts::value<std::vector<std::string>>())
+		("exclude-PAR", "Exclude the PAR region. Equivalent to \"--exclude-region chrX:0-3500000\"")
+		("exclude-XIST-grch38", "Exclude the XIST and TSIX genes in grch38 coordinates. Equivalent to \"--exclude-region chrX:73792204-73852753\"")
+		("exclude-XIST-grch37", "Exclude the XIST and TSIX genes in grch37 coordinates. Equivalent to \"--exclude-region chrX:73012040-73072588\"")
+		("exclude-XIST-chm13", "Exclude the XIST and TSIX genes in chm13 coordinates. Equivalent to \"--exclude-region chrX:72225527-72286069\"")
 	;
-	auto params = options.parse(argc, argv);
+	cxxopts::ParseResult params;
+	try
+	{
+		params = options.parse(argc, argv);
+	}
+	catch (const cxxopts::exceptions::no_such_option& e)
+	{
+		std::cerr << e.what() << std::endl;;
+		std::abort();
+	}
 	if (params.count("v") == 1)
 	{
 		std::cerr << "Version: " << VERSION << std::endl;
@@ -1288,12 +1299,12 @@ int main(int argc, char** argv)
 		std::cerr << "Use only one input" << std::endl;
 		paramError = true;
 	}
-	if (params["noise-decay"].as<double>() >= 1.0)
+	if (params["EM-noise-decay"].as<double>() >= 1.0)
 	{
 		std::cerr << "Noise decay must be less than 1" << std::endl;
 		paramError = true;
 	}
-	if (params["noise-magnitude"].as<double>() < 0)
+	if (params["EM-noise-magnitude"].as<double>() < 0)
 	{
 		std::cerr << "Noise magnitude must be 0 or positive" << std::endl;
 		paramError = true;
@@ -1320,12 +1331,12 @@ int main(int argc, char** argv)
 	{
 		forcedPhaseFile = params["force-phase"].as<std::string>();
 	}
-	size_t randomSeed = params["random-seed"].as<size_t>();
-	size_t numTries = params["num-runs"].as<size_t>();
+	size_t randomSeed = params["EM-random-seed"].as<size_t>();
+	size_t numTries = params["EM-num-runs"].as<size_t>();
 //	std::string annotationFile { argv[5] };
 //	std::string secondStepGeneList { argv[6] };
-	double initialNoiseMagnitude = params["noise-magnitude"].as<double>();
-	double noiseDecay = params["noise-decay"].as<double>();
+	double initialNoiseMagnitude = params["EM-noise-magnitude"].as<double>();
+	double noiseDecay = params["EM-noise-decay"].as<double>();
 //	std::cerr << "read match counts" << std::endl;
 	std::vector<CellMatch> counts;
 	std::vector<std::pair<size_t, size_t>> excludedRegions;
@@ -1339,15 +1350,21 @@ int main(int argc, char** argv)
 			excludedRegions.emplace_back(std::get<1>(region), std::get<2>(region));
 		}
 	}
-	if (params.count("exclude-grch38-PAR-XIST"))
+	if (params.count("exclude-PAR"))
 	{
 		excludedRegions.emplace_back(0, 3500000);
-		excludedRegions.emplace_back(73817774, 73852753);
 	}
-	if (params.count("exclude-grch37-PAR-XIST"))
+	if (params.count("exclude-XIST-grch38"))
 	{
-		excludedRegions.emplace_back(0, 3500000);
-		excludedRegions.emplace_back(73040486, 73072588);
+		excludedRegions.emplace_back(73792204, 73852753);
+	}
+	if (params.count("exclude-XIST-grch37"))
+	{
+		excludedRegions.emplace_back(73012040, 73072588);
+	}
+	if (params.count("exclude-XIST-chm13"))
+	{
+		excludedRegions.emplace_back(72225527, 72286069);
 	}
 	std::sort(excludedRegions.begin(), excludedRegions.end());
 	if (params.count("input-preprocessed-table") > 0)
