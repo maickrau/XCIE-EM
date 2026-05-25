@@ -2,7 +2,7 @@
 
 X-chromosome inactivation escape and phasing from single cell sequencing data using an expectation-maximization algorithm.
 
-### Compiling
+## Compiling
 
 ```
 git clone https://github.com/maickrau/XCIE-EM.git
@@ -11,7 +11,7 @@ git submodule update --init --recursive
 make all
 ```
 
-### Running
+## Running
 
 First run [scReadCounts](https://horvathlab.github.io/NGS/SCReadCounts/) to count the ref/alt coverage per variant per cell. Then run:
 
@@ -23,7 +23,7 @@ This will estimate the variant phases and active chrX per cell. The output is wr
 
 The parameters `--exclude-PAR` `--exclude-XIST-grch38` are not mandatory but they improve the results by removing the PAR and XIST regions, which are difficult to phase from chrX inactivation. For other references you can also use `--exclude-XIST-grch37` or `--exclude-XIST-chm13` or manually with `--exclude-region`.
 
-##### Using trio data
+### Using trio data
 
 If you have trio phasing data for some of the variants of the sample, you can use that to force the trio phased variants into correct phase. The variants which are not phased in the trio phased data will still be phased by the EM algorithm. Even a small amount of trio phased variants will help guide the phasing of the rest of the variants. The trio phasing data is inputed with the parameter `--force-phase trio_phase_file.tsv`. The required format of the trio phase file is one line per variant, with two columns for variant name and phase separated by tab, for example:
 
@@ -33,9 +33,9 @@ X:12356:T:C	pat
 X:12456:T:G	pat
 ```
 
-Variant name should be in format `X:(position):(ref_allele):(alt_allele)` and the phase should be one of `mat` or `pat`.
+Variant name should be in format `X:(position):(ref_allele):(alt_allele)` and phase should be one of `mat` or `pat`.
 
-### Output
+## Output
 
 - `output.variants.tsv`: Description of variant phases, and phasing confidence.
 - `output.cells.tsv`: Description of cell activity (which chrX is active per cell), and activity confidence. The cell activity confidence is estimated only from variants which are estimated to be non-escape.
@@ -44,7 +44,7 @@ Variant name should be in format `X:(position):(ref_allele):(alt_allele)` and th
 - `output.pseudobulk.variants.confidence0.tsv`: The pseudobulk expression of each variant. The expression is split by chromosome, and further by whether the chromosome is the active chrX or inactive chrX. All variants and cells are included, even those whose phasing is uncertain.
 - `output.preprocessed_matches.tsv`: A file with the cell vs variant matches preprocessed into a suitable format.
 
-### Parameters
+## Parameters
 
 - `--input-screadcounts`: Take the counts from scReadCounts as input. Recommended.
 - `--input-preprocessed-table`: Take the counts from a preprocessed table.
