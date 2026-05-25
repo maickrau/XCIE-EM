@@ -190,18 +190,25 @@ std::vector<CellMatch> readMatchCounts(const std::string& matchTableFile)
 	{
 		std::string line;
 		getline(file, line);
-		std::stringstream sstr { line };
-		if (line.size() < 7) continue;
+		if (!file.good()) break;
+		if (line.size() == 0) continue;
+		auto parts = split(line, '\t');
+		if (parts.size() != 4 || (parts[2] != "REF" && parts[2] != "ALT"))
+		{
+			std::cerr << "Input table has invalid format" << std::endl;
+			std::abort();
+		}
 		CellMatch match;
-		std::string altstr;
-		sstr >> match.cell >> match.variant >> altstr >> match.count;
-		if (altstr == "ALT")
+		match.cell = parts[0];
+		match.variant = parts[1];
+		match.count = std::stoull(parts[3]);
+		if (parts[2] == "ALT")
 		{
 			match.alt = true;
 		}
 		else
 		{
-			assert(altstr == "REF");
+			assert(parts[2] == "REF");
 			match.alt = false;
 		}
 		result.emplace_back(match);
