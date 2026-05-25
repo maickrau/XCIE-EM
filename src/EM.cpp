@@ -1,3 +1,5 @@
+#include <tuple>
+#include <regex>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -1209,20 +1211,60 @@ void writeCellMatchCounts(const std::vector<CellMatch>& cellMatches, const std::
 	}
 }
 
+std::tuple<std::string, size_t, size_t> parseBedRegion(const std::string& region)
+{
+	std::regex regex { "^([chrCHR0123456789XYMxymt])+:([0-9]+)-([0-9]+)$" };
+	std::smatch matches;
+	if (std::regex_match(region, matches, regex))
+	{
+		std::string chromosome = matches[1];
+		size_t start = std::stoull(matches[2]);
+		size_t end = std::stoull(matches[3]);
+		if (end > start)
+		{
+			return std::make_tuple(chromosome, start, end);
+		}
+	}
+	return std::make_tuple<std::string, size_t, size_t>("", std::numeric_limits<size_t>::max(), std::numeric_limits<size_t>::max());
+}
+
+std::vector<CellMatch> excludeRegions(const std::vector<CellMatch>& raw, const std::vector<std::pair<size_t, size_t>>& excludedRegions)
+{
+	std::vector<CellMatch> result;
+	for (const auto& t : raw)
+	{
+		size_t variantPos = parseVariantPosition(t.variant);
+		bool excluded = false;
+		for (const auto& region : excludedRegions)
+		{
+			if (region.first > variantPos) break;
+			if (region.second < variantPos) continue;
+			excluded = true;
+			break;
+		}
+		if (excluded) continue;
+		result.emplace_back(t);
+	}
+	return result;
+}
+
 int main(int argc, char** argv)
 {
 	cxxopts::Options options { "XCIE-EM" };
 	options.add_options()
 		("h,help", "Print help")
 		("v,version", "Print version")
-		("input-preprocessed-table", "Input prerocessed table of cell/variant matches", cxxopts::value<std::string>())
 		("input-screadcounts", "Input scReadCounts cell/variant match table", cxxopts::value<std::string>())
+		("input-preprocessed-table", "Input prerocessed table of cell/variant matches", cxxopts::value<std::string>())
 		("o,out", "Output prefix", cxxopts::value<std::string>()->default_value("./result"))
 		("force-phase", "File with pre-phased trio variants", cxxopts::value<std::string>())
 		("noise-magnitude", "initial EM noise magnitude", cxxopts::value<double>()->default_value("20"))
 		("noise-decay", "EM noise decay", cxxopts::value<double>()->default_value("0.95"))
 		("random-seed", "Random seed for EM initialization", cxxopts::value<size_t>()->default_value("1"))
 		("num-runs", "Number of runs for EM", cxxopts::value<size_t>()->default_value("10"))
+		("exclude-region", "Exclude regions from EM", cxxopts::value<std::vector<std::string>>())
+		("exclude-grch38-PAR-XIST", "Exclude the PAR and XIST regions in grch38 coordinates. Equivalent to \"--exclude-region chrX:0-3500000 --exclude-region chrX:73817774-73852753\"")
+		("exclude-grch37-PAR-XIST", "Exclude the PAR and XIST regions in grch37 coordinates. Equivalent to \"--exclude-region chrX:0-3500000 --exclude-region chrX:73040486-73072588\"")
 	;
 	auto params = options.parse(argc, argv);
 	if (params.count("v") == 1)
@@ -1256,6 +1298,18 @@ int main(int argc, char** argv)
 		std::cerr << "Noise magnitude must be 0 or positive" << std::endl;
 		paramError = true;
 	}
+	if (params.count("exclude-region") > 0)
+	{
+		for (std::string value : params["exclude-region"].as<std::vector<std::string>>())
+		{
+			std::tuple<std::string, size_t, size_t> region = parseBedRegion(value);
+			if (std::get<0>(region) == "" && std::get<1>(region) == std::numeric_limits<size_t>::max() && std::get<2>(region) == std::numeric_limits<size_t>::max())
+			{
+				std::cerr << "Could not parse region \"" << value << "\". Regions should be in format chrX:1-3000000" << std::endl;
+				paramError = true;
+			}
+		}
+	}
 	if (paramError)
 	{
 		std::abort();
@@ -1274,6 +1328,28 @@ int main(int argc, char** argv)
 	double noiseDecay = params["noise-decay"].as<double>();
 //	std::cerr << "read match counts" << std::endl;
 	std::vector<CellMatch> counts;
+	std::vector<std::pair<size_t, size_t>> excludedRegions;
+	if (params.count("exclude-region") > 0)
+	{
+		for (std::string value : params["exclude-region"].as<std::vector<std::string>>())
+		{
+			std::tuple<std::string, size_t, size_t> region = parseBedRegion(value);
+			std::string chromosome = std::get<0>(region);
+			if (chromosome != "23" && lowercase(chromosome) != "x" && lowercase(chromosome) != "chrx") continue;
+			excludedRegions.emplace_back(std::get<1>(region), std::get<2>(region));
+		}
+	}
+	if (params.count("exclude-grch38-PAR-XIST"))
+	{
+		excludedRegions.emplace_back(0, 3500000);
+		excludedRegions.emplace_back(73817774, 73852753);
+	}
+	if (params.count("exclude-grch37-PAR-XIST"))
+	{
+		excludedRegions.emplace_back(0, 3500000);
+		excludedRegions.emplace_back(73040486, 73072588);
+	}
+	std::sort(excludedRegions.begin(), excludedRegions.end());
 	if (params.count("input-preprocessed-table") > 0)
 	{
 		std::string matchTableFile = params["input-preprocessed-table"].as<std::string>();
@@ -1284,6 +1360,16 @@ int main(int argc, char** argv)
 		std::string scReadCountsFile = params["input-screadcounts"].as<std::string>();
 		counts = readScReadCountsMatchCounts(scReadCountsFile);
 		counts = filterOutHomozygousSites(counts);
+	}
+	if (excludedRegions.size() > 0)
+	{
+		std::cerr << "excluding regions:";
+		for (auto t : excludedRegions)
+		{
+			std::cerr << " " << t.first << "-" << t.second;
+		}
+		std::cerr << std::endl;
+		counts = excludeRegions(counts, excludedRegions);
 	}
 	writeCellMatchCounts(counts, outputPrefix + ".preprocessed_matches.tsv");
 //	std::cerr << "get helper variables" << std::endl;
