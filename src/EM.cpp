@@ -756,11 +756,9 @@ std::pair<double, double> getCellEscapeConfidenceInterval(const EMResult& result
 	return std::make_pair(minResult, maxResult);
 }
 
-void writeResultOnlyNonescapeVariants(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, std::ostream& stream)
+void writeResultCellOnlyNonescapeVariants(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, std::ostream& stream)
 {
-	std::vector<std::string> variantOrder = getVariantOrder(helpers.variantNameToIndex);
 	std::vector<std::string> cellOrder = getCellOrder(helpers.cellNameToIndex);
-	std::unordered_map<std::string, size_t> variantCoverage;
 	std::unordered_map<std::string, size_t> cellCoverage;
 	std::vector<bool> ignoreEscapeVariants;
 	ignoreEscapeVariants.resize(helpers.variantNameToIndex.size(), false);
@@ -771,21 +769,9 @@ void writeResultOnlyNonescapeVariants(const EMResult& result, const std::vector<
 	}
 	for (const auto& t : cellMatches)
 	{
-		variantCoverage[t.variant] += t.count;
 		cellCoverage[t.cell] += t.count;
 	}
-	for (const std::string& variant : variantOrder)
-	{
-		const size_t variantIndex = helpers.variantNameToIndex.at(variant);
-		const bool matRef = result.variantIsMatRef[variantIndex];
-		double matXe, patXe;
-		std::tie(matXe, patXe) = getOptimalVariantXe(result, helpers, variantIndex);
-		double phaseScoreDifference = getVariantLogProbs(result, helpers, variantIndex, matRef ? matXe : patXe, matRef);
-		phaseScoreDifference -= getVariantLogProbs(result, helpers, variantIndex, matRef ? patXe : matXe, !matRef);
-		double escapeConfidenceIntervalMin, escapeConfidenceIntervalMax;
-		std::tie(escapeConfidenceIntervalMin, escapeConfidenceIntervalMax) = getVariantEscapeConfidenceInterval(result, helpers, variantIndex, matRef ? matXe : patXe, matRef, 0.95);
-		stream << variant << "\t" << variantCoverage.at(variant) << "\t" <<  (matRef ? "mat" : "pat") << "\t" << phaseScoreDifference << "\t" << result.variantEscapeFraction[variantIndex] << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << std::endl;
-	}
+	stream << "cell\tcoverage\tactive_chrX\tactive_chrX_confidence\tescape_estimate\tescape_ci_low\tescape_ci_high" << std::endl;
 	for (const std::string& cell : cellOrder)
 	{
 		const size_t cellIndex = helpers.cellNameToIndex.at(cell);
@@ -800,31 +786,17 @@ void writeResultOnlyNonescapeVariants(const EMResult& result, const std::vector<
 	}
 }
 
-void writeResult(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, std::ostream& stream)
+void writeResultCells(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, std::ostream& stream)
 {
-	std::vector<std::string> variantOrder = getVariantOrder(helpers.variantNameToIndex);
 	std::vector<std::string> cellOrder = getCellOrder(helpers.cellNameToIndex);
-	std::unordered_map<std::string, size_t> variantCoverage;
 	std::unordered_map<std::string, size_t> cellCoverage;
 	std::vector<bool> ignoreNothing;
 	ignoreNothing.resize(helpers.variantNameToIndex.size(), false);
 	for (const auto& t : cellMatches)
 	{
-		variantCoverage[t.variant] += t.count;
 		cellCoverage[t.cell] += t.count;
 	}
-	for (const std::string& variant : variantOrder)
-	{
-		const size_t variantIndex = helpers.variantNameToIndex.at(variant);
-		const bool matRef = result.variantIsMatRef[variantIndex];
-		double matXe, patXe;
-		std::tie(matXe, patXe) = getOptimalVariantXe(result, helpers, variantIndex);
-		double phaseScoreDifference = getVariantLogProbs(result, helpers, variantIndex, matRef ? matXe : patXe, matRef);
-		phaseScoreDifference -= getVariantLogProbs(result, helpers, variantIndex, matRef ? patXe : matXe, !matRef);
-		double escapeConfidenceIntervalMin, escapeConfidenceIntervalMax;
-		std::tie(escapeConfidenceIntervalMin, escapeConfidenceIntervalMax) = getVariantEscapeConfidenceInterval(result, helpers, variantIndex, matRef ? matXe : patXe, matRef, 0.95);
-		stream << variant << "\t" << variantCoverage.at(variant) << "\t" <<  (matRef ? "mat" : "pat") << "\t" << phaseScoreDifference << "\t" << result.variantEscapeFraction[variantIndex] << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << std::endl;
-	}
+	stream << "cell\tcoverage\tactive_chrX\tactive_chrX_confidence\tescape_estimate\tescape_ci_low\tescape_ci_high" << std::endl;
 	for (const std::string& cell : cellOrder)
 	{
 		const size_t cellIndex = helpers.cellNameToIndex.at(cell);
@@ -836,6 +808,29 @@ void writeResult(const EMResult& result, const std::vector<CellMatch>& cellMatch
 		double escapeConfidenceIntervalMin, escapeConfidenceIntervalMax;
 		std::tie(escapeConfidenceIntervalMin, escapeConfidenceIntervalMax) = getCellEscapeConfidenceInterval(result, helpers, cellIndex, matActive ? matCe : patCe, matActive, 0.95, ignoreNothing);
 		stream << cell << "\t" << cellCoverage.at(cell) << "\t" << (matActive ? "mat" : "pat") << "\t" << scoreDifference << "\t" << result.cellEscapeFraction[cellIndex] << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << std::endl;
+	}
+}
+
+void writeResultVariants(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, std::ostream& stream)
+{
+	std::vector<std::string> variantOrder = getVariantOrder(helpers.variantNameToIndex);
+	std::unordered_map<std::string, size_t> variantCoverage;
+	for (const auto& t : cellMatches)
+	{
+		variantCoverage[t.variant] += t.count;
+	}
+	stream << "variant\tcoverage\tphase\tphase_confidence\tescape_estimate\tescape_ci_low\tescape_ci_high" << std::endl;
+	for (const std::string& variant : variantOrder)
+	{
+		const size_t variantIndex = helpers.variantNameToIndex.at(variant);
+		const bool matRef = result.variantIsMatRef[variantIndex];
+		double matXe, patXe;
+		std::tie(matXe, patXe) = getOptimalVariantXe(result, helpers, variantIndex);
+		double phaseScoreDifference = getVariantLogProbs(result, helpers, variantIndex, matRef ? matXe : patXe, matRef);
+		phaseScoreDifference -= getVariantLogProbs(result, helpers, variantIndex, matRef ? patXe : matXe, !matRef);
+		double escapeConfidenceIntervalMin, escapeConfidenceIntervalMax;
+		std::tie(escapeConfidenceIntervalMin, escapeConfidenceIntervalMax) = getVariantEscapeConfidenceInterval(result, helpers, variantIndex, matRef ? matXe : patXe, matRef, 0.95);
+		stream << variant << "\t" << variantCoverage.at(variant) << "\t" <<  (matRef ? "mat" : "pat") << "\t" << phaseScoreDifference << "\t" << result.variantEscapeFraction[variantIndex] << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << std::endl;
 	}
 }
 
@@ -1230,9 +1225,16 @@ int main(int argc, char** argv)
 		}
 	}
 	std::cerr << "best score " << bestScore << std::endl;
-	writeResult(bestResult, counts, helpers, std::cout);
 	{
-		std::ofstream file { "result_noescapevariant.txt" };
-		writeResultOnlyNonescapeVariants(bestResult, counts, helpers, file);
+		std::ofstream variantResult { outputPrefix + ".variants.tsv" };
+		writeResultVariants(bestResult, counts, helpers, variantResult);
+	}
+	{
+		std::ofstream cellResultWithEscapeVariants { outputPrefix + ".cells.withescapevariants.tsv" };
+		writeResultCells(bestResult, counts, helpers, cellResultWithEscapeVariants);
+	}
+	{
+		std::ofstream cellResult { outputPrefix + ".cells.tsv" };
+		writeResultCellOnlyNonescapeVariants(bestResult, counts, helpers, cellResult);
 	}
 }
