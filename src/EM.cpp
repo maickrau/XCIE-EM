@@ -108,6 +108,15 @@ std::vector<CellMatch> filterOutHomozygousSites(const std::vector<CellMatch>& ra
 	return result;
 }
 
+std::string lowercase(std::string raw)
+{
+	for (size_t i = 0; i < raw.size(); i++)
+	{
+		raw[i] = std::tolower(raw[i]);
+	}
+	return raw;
+}
+
 std::vector<CellMatch> readScReadCountsMatchCounts(const std::string& scReadCountsFile)
 {
 	std::ifstream file { scReadCountsFile };
@@ -131,7 +140,7 @@ std::vector<CellMatch> readScReadCountsMatchCounts(const std::string& scReadCoun
 		std::getline(file, line);
 		if (!file.good()) break;
 		parts = split(line, '\t');
-		if (parts[0] != "X" && parts[0] != "23")
+		if (parts[0] != "23" && lowercase(parts[0]) != "x" && lowercase(parts[0]) != "chrx")
 		{
 			continue;
 		}
