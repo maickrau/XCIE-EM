@@ -29,7 +29,7 @@ The parameters `--exclude-PAR` `--exclude-XIST-grch38` are not mandatory but the
 - `output.cells.tsv`: Description of cell activity (which chrX is active per cell), and activity confidence. The cell activity confidence is estimated only from variants which are estimated to be non-escape.
 - `output.cells.withescapevariants.tsv`: Description of cell activity (which chrX is active per cell), and activity confidence. The cell activity confidence is estimated from all variants, which biases the cell activity confidence estimate downwards for cells which have high expression in escape variants. Not recommended to be used unless you know what you are doing.
 - `output.pseudobulk.variants.confidence2.tsv`: The pseudobulk expression of each variant. The expression is split by chromosome, and further by whether the chromosome is the active chrX or inactive chrX. Only variants and cells which are confidently phased are included.
-- `output.pseudobulk.variants.confidence2.tsv`: The pseudobulk expression of each variant. The expression is split by chromosome, and further by whether the chromosome is the active chrX or inactive chrX. All variants and cells are included, even those whose phasing is uncertain.
+- `output.pseudobulk.variants.confidence0.tsv`: The pseudobulk expression of each variant. The expression is split by chromosome, and further by whether the chromosome is the active chrX or inactive chrX. All variants and cells are included, even those whose phasing is uncertain.
 - `output.preprocessed_matches.tsv`: A file with the cell vs variant matches preprocessed into a suitable format.
 
 ### Parameters
