@@ -68,6 +68,99 @@ size_t getCount(const std::vector<std::unordered_map<size_t, size_t>>& cellVaria
 	return cellVariantCount[cell].at(variant);
 }
 
+std::vector<std::string> split(const std::string& raw, const char separator)
+{
+	std::vector<std::string> result;
+	size_t lastSplit = 0;
+	for (size_t i = 0; i < raw.size(); i++)
+	{
+		if (raw[i] != separator) continue;
+		result.emplace_back(raw.begin()+lastSplit, raw.begin()+i);
+		lastSplit = i+1;
+	}
+	result.emplace_back(raw.begin()+lastSplit, raw.end());
+	return result;
+}
+
+std::vector<CellMatch> filterOutHomozygousSites(const std::vector<CellMatch>& raw)
+{
+	const double minMinorAlleleRatio = 0.2;
+	std::unordered_map<std::string, size_t> variantRefCount;
+	std::unordered_map<std::string, size_t> variantAltCount;
+	for (const auto& match : raw)
+	{
+		if (match.alt)
+		{
+			variantAltCount[match.variant] += match.count;
+		}
+		else
+		{
+			variantRefCount[match.variant] += match.count;
+		}
+	}
+	std::vector<CellMatch> result;
+	for (const auto& match : raw)
+	{
+		if ((double)variantRefCount[match.variant] < (double)variantAltCount[match.variant] * minMinorAlleleRatio) continue;
+		if ((double)variantAltCount[match.variant] < (double)variantRefCount[match.variant] * minMinorAlleleRatio) continue;
+		result.emplace_back(match);
+	}
+	return result;
+}
+
+std::vector<CellMatch> readScReadCountsMatchCounts(const std::string& scReadCountsFile)
+{
+	std::ifstream file { scReadCountsFile };
+	if (!file.good())
+	{
+		std::cerr << "Input scReadCounts file can't be read!" << std::endl;
+		std::abort();
+	}
+	std::string header;
+	std::getline(file, header);
+	auto parts = split(header, '\t');
+	if (parts.size() != 14 || parts[0] != "CHROM" || parts[1] != "POS" || parts[2] != "REF" || parts[3] != "ALT" || parts[4] != "ReadGroup" || parts[9] != "SNVCount" || parts[10] != "RefCount")
+	{
+		std::cerr << "Input scReadCounts file format is wrong. Double check that you are using the sparse matrix tsv file (output.tsv) and not the dense matrix file (output.cnt.matrix.tsv or output.vaf-m1.matrix.tsv)" << std::endl;
+		std::abort();
+	}
+	std::vector<CellMatch> matches;
+	while (file.good())
+	{
+		std::string line;
+		std::getline(file, line);
+		if (!file.good()) break;
+		parts = split(line, '\t');
+		if (parts[0] != "X" && parts[0] != "23")
+		{
+			continue;
+		}
+		std::string variantName = parts[0] + ":" + parts[1] + ":" + parts[2] + ":" + parts[3];
+		std::string barcode = parts[4];
+		size_t refMatch = std::stoull(parts[10]);
+		size_t altMatch = std::stoull(parts[9]);
+		if (refMatch > 0)
+		{
+			CellMatch match;
+			match.variant = variantName;
+			match.cell = barcode;
+			match.alt = false;
+			match.count = refMatch;
+			matches.emplace_back(match);
+		}
+		if (altMatch > 0)
+		{
+			CellMatch match;
+			match.variant = variantName;
+			match.cell = barcode;
+			match.alt = true;
+			match.count = altMatch;
+			matches.emplace_back(match);
+		}
+	}
+	return matches;
+}
+
 std::vector<CellMatch> readMatchCounts(const std::string& matchTableFile)
 {
 	std::ifstream file { matchTableFile };
@@ -1021,13 +1114,23 @@ std::vector<size_t> loadSecondStepVariants(const std::string& annotationFile, co
 	return result;
 }
 
+void writeCellMatchCounts(const std::vector<CellMatch>& cellMatches, const std::string& filename)
+{
+	std::ofstream file { filename };
+	for (const auto& match : cellMatches)
+	{
+		file << match.cell << "\t" << match.variant << "\t" << (match.alt ? "ALT" : "REF") << "\t" << match.count << std::endl;
+	}
+}
+
 int main(int argc, char** argv)
 {
 	cxxopts::Options options { "XCIE-EM" };
 	options.add_options()
 		("h,help", "Print help")
 		("v,version", "Print version")
-		("input-table", "Input table of cell/variant matches", cxxopts::value<std::string>())
+		("input-preprocessed-table", "Input prerocessed table of cell/variant matches", cxxopts::value<std::string>())
+		("input-screadcounts", "Input scReadCounts cell/variant match table", cxxopts::value<std::string>())
 		("o,out", "Output prefix", cxxopts::value<std::string>()->default_value("./result"))
 		("force-phase", "File with pre-phased trio variants", cxxopts::value<std::string>())
 		("noise-magnitude", "initial EM noise magnitude", cxxopts::value<double>()->default_value("20"))
@@ -1047,9 +1150,14 @@ int main(int argc, char** argv)
 		std::exit(0);
 	}
 	bool paramError = false;
-	if (params.count("input-table") == 0)
+	if (params.count("input-preprocessed-table") == 0 && params.count("input-screadcounts") == 0)
 	{
-		std::cerr << "Input table is required" << std::endl;
+		std::cerr << "Input is required" << std::endl;
+		paramError = true;
+	}
+	if (params.count("input-preprocessed-table") + params.count("input-screadcounts") > 1)
+	{
+		std::cerr << "Use only one input" << std::endl;
 		paramError = true;
 	}
 	if (params["noise-decay"].as<double>() >= 1.0)
@@ -1066,7 +1174,7 @@ int main(int argc, char** argv)
 	{
 		std::abort();
 	}
-	std::string matchTableFile = params["input-table"].as<std::string>();
+	std::string outputPrefix = params["o"].as<std::string>();
 	std::string forcedPhaseFile = "";
 	if (params.count("force-phase") > 0)
 	{
@@ -1079,7 +1187,19 @@ int main(int argc, char** argv)
 	double initialNoiseMagnitude = params["noise-magnitude"].as<double>();
 	double noiseDecay = params["noise-decay"].as<double>();
 //	std::cerr << "read match counts" << std::endl;
-	std::vector<CellMatch> counts = readMatchCounts(matchTableFile);
+	std::vector<CellMatch> counts;
+	if (params.count("input-preprocessed-table") > 0)
+	{
+		std::string matchTableFile = params["input-preprocessed-table"].as<std::string>();
+		counts = readMatchCounts(matchTableFile);
+	}
+	if (params.count("input-screadcounts") > 0)
+	{
+		std::string scReadCountsFile = params["input-screadcounts"].as<std::string>();
+		counts = readScReadCountsMatchCounts(scReadCountsFile);
+		counts = filterOutHomozygousSites(counts);
+	}
+	writeCellMatchCounts(counts, outputPrefix + ".preprocessed_matches.tsv");
 //	std::cerr << "get helper variables" << std::endl;
 	EMHelperVariables helpers = getHelpers(counts);
 //	std::cerr << "read forced variant phases" << std::endl;
