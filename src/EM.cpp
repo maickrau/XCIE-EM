@@ -62,6 +62,16 @@ public:
 	std::vector<std::vector<size_t>> activeVariantsPerCell;
 };
 
+std::string matHapName(const bool phasesAreMatPat)
+{
+	return phasesAreMatPat ? "mat" : "hap1";
+}
+
+std::string patHapName(const bool phasesAreMatPat)
+{
+	return phasesAreMatPat ? "pat" : "hap2";
+}
+
 size_t getCount(const std::vector<std::unordered_map<size_t, size_t>>& cellVariantCount, const size_t cell, const size_t variant)
 {
 	if (cellVariantCount[cell].count(variant) == 0) return 0;
@@ -767,8 +777,8 @@ std::pair<double, double> getCellEscapeConfidenceInterval(const EMResult& result
 
 void writeResultCellOnlyNonescapeVariants(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, const bool phasesAreMatPat, std::ostream& stream)
 {
-	const std::string matName = phasesAreMatPat ? "mat" : "hap1";
-	const std::string patName = phasesAreMatPat ? "pat" : "hap2";
+	const std::string matName = matHapName(phasesAreMatPat);
+	const std::string patName = patHapName(phasesAreMatPat);
 	std::vector<std::string> cellOrder = getCellOrder(helpers.cellNameToIndex);
 	std::unordered_map<std::string, size_t> cellCoverage;
 	std::vector<bool> ignoreEscapeVariants;
@@ -799,8 +809,8 @@ void writeResultCellOnlyNonescapeVariants(const EMResult& result, const std::vec
 
 void writeResultCells(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, const bool phasesAreMatPat, std::ostream& stream)
 {
-	const std::string matName = phasesAreMatPat ? "mat" : "hap1";
-	const std::string patName = phasesAreMatPat ? "pat" : "hap2";
+	const std::string matName = matHapName(phasesAreMatPat);
+	const std::string patName = patHapName(phasesAreMatPat);
 	std::vector<std::string> cellOrder = getCellOrder(helpers.cellNameToIndex);
 	std::unordered_map<std::string, size_t> cellCoverage;
 	std::vector<bool> ignoreNothing;
@@ -826,8 +836,8 @@ void writeResultCells(const EMResult& result, const std::vector<CellMatch>& cell
 
 void writeResultVariants(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, const bool phasesAreMatPat, std::ostream& stream)
 {
-	const std::string matName = phasesAreMatPat ? "mat" : "hap1";
-	const std::string patName = phasesAreMatPat ? "pat" : "hap2";
+	const std::string matName = matHapName(phasesAreMatPat);
+	const std::string patName = patHapName(phasesAreMatPat);
 	std::vector<std::string> variantOrder = getVariantOrder(helpers.variantNameToIndex);
 	std::unordered_map<std::string, size_t> variantCoverage;
 	for (const auto& t : cellMatches)
@@ -846,6 +856,72 @@ void writeResultVariants(const EMResult& result, const std::vector<CellMatch>& c
 		double escapeConfidenceIntervalMin, escapeConfidenceIntervalMax;
 		std::tie(escapeConfidenceIntervalMin, escapeConfidenceIntervalMax) = getVariantEscapeConfidenceInterval(result, helpers, variantIndex, matRef ? matXe : patXe, matRef, 0.95);
 		stream << variant << "\t" << variantCoverage.at(variant) << "\t" <<  (matRef ? matName : patName) << "\t" << phaseScoreDifference << "\t" << result.variantEscapeFraction[variantIndex] << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << std::endl;
+	}
+}
+
+void writePseudobulkVariantResults(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, const bool phasesAreMatPat, const double minConfidence, const std::string filename)
+{
+	const std::string matName = matHapName(phasesAreMatPat);
+	const std::string patName = patHapName(phasesAreMatPat);
+	std::vector<std::string> variantOrder = getVariantOrder(helpers.variantNameToIndex);
+	std::unordered_map<size_t, size_t> variantCoverageMatXa;
+	std::unordered_map<size_t, size_t> variantCoverageMatXi;
+	std::unordered_map<size_t, size_t> variantCoveragePatXa;
+	std::unordered_map<size_t, size_t> variantCoveragePatXi;
+	std::unordered_set<size_t> includedVariants;
+	std::vector<bool> ignoreNothing;
+	ignoreNothing.resize(helpers.variantNameToIndex.size(), false);
+	for (size_t variantIndex = 0; variantIndex < helpers.variantNameToIndex.size(); variantIndex++)
+	{
+		const bool matRef = result.variantIsMatRef[variantIndex];
+		double matXe, patXe;
+		std::tie(matXe, patXe) = getOptimalVariantXe(result, helpers, variantIndex);
+		double phaseScoreDifference = getVariantLogProbs(result, helpers, variantIndex, matRef ? matXe : patXe, matRef);
+		phaseScoreDifference -= getVariantLogProbs(result, helpers, variantIndex, matRef ? patXe : matXe, !matRef);
+		if (phaseScoreDifference < minConfidence) continue;
+		includedVariants.insert(variantIndex);
+	}
+	std::unordered_set<size_t> includedCells;
+	for (size_t cellIndex = 0; cellIndex < helpers.cellNameToIndex.size(); cellIndex++)
+	{
+		const bool matActive = result.cellIsMatActive[cellIndex];
+		double matCe, patCe;
+		std::tie(matCe, patCe) = getOptimalCellCe(result, helpers, cellIndex, ignoreNothing);
+		double scoreDifference = getCellLogProb(result, helpers, cellIndex, matActive ? matCe : patCe, matActive, ignoreNothing);
+		scoreDifference -= getCellLogProb(result, helpers, cellIndex, matActive ? patCe : matCe, !matActive, ignoreNothing);
+		if (scoreDifference < minConfidence) continue;
+		includedCells.insert(cellIndex);
+	}
+	for (const auto& t : cellMatches)
+	{
+		const size_t variantIndex = helpers.variantNameToIndex.at(t.variant);
+		const size_t cellIndex = helpers.cellNameToIndex.at(t.cell);
+		if (includedVariants.count(variantIndex) == 0) continue;
+		if (includedCells.count(cellIndex) == 0) continue;
+		bool activeCoverage = (result.variantIsMatRef[variantIndex] == result.cellIsMatActive[cellIndex]) == (!t.alt);
+		if (activeCoverage && result.cellIsMatActive[cellIndex])
+		{
+			variantCoverageMatXa[variantIndex] += t.count;
+		}
+		if (!activeCoverage && result.cellIsMatActive[cellIndex])
+		{
+			variantCoverageMatXi[variantIndex] += t.count;
+		}
+		if (activeCoverage && !result.cellIsMatActive[cellIndex])
+		{
+			variantCoveragePatXa[variantIndex] += t.count;
+		}
+		if (!activeCoverage && !result.cellIsMatActive[cellIndex])
+		{
+			variantCoveragePatXi[variantIndex] += t.count;
+		}
+	}
+	std::ofstream file { filename };
+	file << "variant\t" << matName << "_active_expression" << "\t" << matName << "_inactive_expression" << "\t" << patName << "_active_expression" << "\t" << patName << "_inactive_expression" << std::endl;
+	for (const std::string& variant : variantOrder)
+	{
+		const size_t variantIndex = helpers.variantNameToIndex.at(variant);
+		file << variant << "\t" << variantCoverageMatXa[variantIndex] << "\t" << variantCoverageMatXi[variantIndex] << "\t" << variantCoveragePatXa[variantIndex] << "\t" << variantCoveragePatXi[variantIndex] << std::endl;
 	}
 }
 
@@ -1253,4 +1329,5 @@ int main(int argc, char** argv)
 		std::ofstream cellResult { outputPrefix + ".cells.tsv" };
 		writeResultCellOnlyNonescapeVariants(bestResult, counts, helpers, phasesAreMatPat, cellResult);
 	}
+	writePseudobulkVariantResults(bestResult, counts, helpers, phasesAreMatPat, 2, outputPrefix + ".pseudobulk.variants.tsv");
 }
