@@ -23,6 +23,18 @@ This will estimate the variant phases and active chrX per cell. The output is wr
 
 The parameters `--exclude-PAR` `--exclude-XIST-grch38` are not mandatory but they improve the results by removing the PAR and XIST regions, which are difficult to phase from chrX inactivation. For other references you can also use `--exclude-XIST-grch37` or `--exclude-XIST-chm13` or manually with `--exclude-region`.
 
+##### Using trio data
+
+If you have trio phasing data for some of the variants of the sample, you can use that to force the trio phased variants into correct phase. The variants which are not phased in the trio phased data will still be phased by the EM algorithm. Even a small amount of trio phased variants will help guide the phasing of the rest of the variants. The trio phasing data is inputed with the parameter `--force-phase trio_phase_file.tsv`. The required format of the trio phase file is one line per variant, with two columns for variant name and phase separated by tab, for example:
+
+```
+X:12345:A:G	mat
+X:12356:T:C	pat
+X:12456:T:G	pat
+```
+
+Variant name should be in format `X:(position):(ref_allele):(alt_allele)` and the phase should be one of `mat` or `pat`.
+
 ### Output
 
 - `output.variants.tsv`: Description of variant phases, and phasing confidence.
