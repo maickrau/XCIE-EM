@@ -1329,5 +1329,6 @@ int main(int argc, char** argv)
 		std::ofstream cellResult { outputPrefix + ".cells.tsv" };
 		writeResultCellOnlyNonescapeVariants(bestResult, counts, helpers, phasesAreMatPat, cellResult);
 	}
-	writePseudobulkVariantResults(bestResult, counts, helpers, phasesAreMatPat, 2, outputPrefix + ".pseudobulk.variants.tsv");
+	writePseudobulkVariantResults(bestResult, counts, helpers, phasesAreMatPat, 2, outputPrefix + ".pseudobulk.variants.confidence2.tsv");
+	writePseudobulkVariantResults(bestResult, counts, helpers, phasesAreMatPat, 0, outputPrefix + ".pseudobulk.variants.confidence0.tsv");
 }
