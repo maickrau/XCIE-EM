@@ -756,8 +756,10 @@ std::pair<double, double> getCellEscapeConfidenceInterval(const EMResult& result
 	return std::make_pair(minResult, maxResult);
 }
 
-void writeResultCellOnlyNonescapeVariants(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, std::ostream& stream)
+void writeResultCellOnlyNonescapeVariants(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, const bool phasesAreMatPat, std::ostream& stream)
 {
+	const std::string matName = phasesAreMatPat ? "mat" : "hap1";
+	const std::string patName = phasesAreMatPat ? "pat" : "hap2";
 	std::vector<std::string> cellOrder = getCellOrder(helpers.cellNameToIndex);
 	std::unordered_map<std::string, size_t> cellCoverage;
 	std::vector<bool> ignoreEscapeVariants;
@@ -782,12 +784,14 @@ void writeResultCellOnlyNonescapeVariants(const EMResult& result, const std::vec
 		scoreDifference -= getCellLogProb(result, helpers, cellIndex, matActive ? patCe : matCe, !matActive, ignoreEscapeVariants);
 		double escapeConfidenceIntervalMin, escapeConfidenceIntervalMax;
 		std::tie(escapeConfidenceIntervalMin, escapeConfidenceIntervalMax) = getCellEscapeConfidenceInterval(result, helpers, cellIndex, matActive ? matCe : patCe, matActive, 0.95, ignoreEscapeVariants);
-		stream << cell << "\t" << cellCoverage.at(cell) << "\t" << (matActive ? "mat" : "pat") << "\t" << scoreDifference << "\t" << result.cellEscapeFraction[cellIndex] << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << std::endl;
+		stream << cell << "\t" << cellCoverage.at(cell) << "\t" << (matActive ? matName : patName) << "\t" << scoreDifference << "\t" << result.cellEscapeFraction[cellIndex] << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << std::endl;
 	}
 }
 
-void writeResultCells(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, std::ostream& stream)
+void writeResultCells(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, const bool phasesAreMatPat, std::ostream& stream)
 {
+	const std::string matName = phasesAreMatPat ? "mat" : "hap1";
+	const std::string patName = phasesAreMatPat ? "pat" : "hap2";
 	std::vector<std::string> cellOrder = getCellOrder(helpers.cellNameToIndex);
 	std::unordered_map<std::string, size_t> cellCoverage;
 	std::vector<bool> ignoreNothing;
@@ -807,12 +811,14 @@ void writeResultCells(const EMResult& result, const std::vector<CellMatch>& cell
 		scoreDifference -= getCellLogProb(result, helpers, cellIndex, matActive ? patCe : matCe, !matActive, ignoreNothing);
 		double escapeConfidenceIntervalMin, escapeConfidenceIntervalMax;
 		std::tie(escapeConfidenceIntervalMin, escapeConfidenceIntervalMax) = getCellEscapeConfidenceInterval(result, helpers, cellIndex, matActive ? matCe : patCe, matActive, 0.95, ignoreNothing);
-		stream << cell << "\t" << cellCoverage.at(cell) << "\t" << (matActive ? "mat" : "pat") << "\t" << scoreDifference << "\t" << result.cellEscapeFraction[cellIndex] << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << std::endl;
+		stream << cell << "\t" << cellCoverage.at(cell) << "\t" << (matActive ? matName : patName) << "\t" << scoreDifference << "\t" << result.cellEscapeFraction[cellIndex] << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << std::endl;
 	}
 }
 
-void writeResultVariants(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, std::ostream& stream)
+void writeResultVariants(const EMResult& result, const std::vector<CellMatch>& cellMatches, const EMHelperVariables& helpers, const bool phasesAreMatPat, std::ostream& stream)
 {
+	const std::string matName = phasesAreMatPat ? "mat" : "hap1";
+	const std::string patName = phasesAreMatPat ? "pat" : "hap2";
 	std::vector<std::string> variantOrder = getVariantOrder(helpers.variantNameToIndex);
 	std::unordered_map<std::string, size_t> variantCoverage;
 	for (const auto& t : cellMatches)
@@ -830,7 +836,7 @@ void writeResultVariants(const EMResult& result, const std::vector<CellMatch>& c
 		phaseScoreDifference -= getVariantLogProbs(result, helpers, variantIndex, matRef ? patXe : matXe, !matRef);
 		double escapeConfidenceIntervalMin, escapeConfidenceIntervalMax;
 		std::tie(escapeConfidenceIntervalMin, escapeConfidenceIntervalMax) = getVariantEscapeConfidenceInterval(result, helpers, variantIndex, matRef ? matXe : patXe, matRef, 0.95);
-		stream << variant << "\t" << variantCoverage.at(variant) << "\t" <<  (matRef ? "mat" : "pat") << "\t" << phaseScoreDifference << "\t" << result.variantEscapeFraction[variantIndex] << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << std::endl;
+		stream << variant << "\t" << variantCoverage.at(variant) << "\t" <<  (matRef ? matName : patName) << "\t" << phaseScoreDifference << "\t" << result.variantEscapeFraction[variantIndex] << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << std::endl;
 	}
 }
 
@@ -1199,6 +1205,7 @@ int main(int argc, char** argv)
 	EMHelperVariables helpers = getHelpers(counts);
 //	std::cerr << "read forced variant phases" << std::endl;
 	auto forcedPhases = readForcedVariantPhases(forcedPhaseFile, helpers);
+	bool phasesAreMatPat = (forcedPhases.size() > 0);
 	std::vector<size_t> iterationsWithGoodScore;
 	double bestScore = -100000.0;
 	EMResult bestResult;
@@ -1227,14 +1234,14 @@ int main(int argc, char** argv)
 	std::cerr << "best score " << bestScore << std::endl;
 	{
 		std::ofstream variantResult { outputPrefix + ".variants.tsv" };
-		writeResultVariants(bestResult, counts, helpers, variantResult);
+		writeResultVariants(bestResult, counts, helpers, phasesAreMatPat, variantResult);
 	}
 	{
 		std::ofstream cellResultWithEscapeVariants { outputPrefix + ".cells.withescapevariants.tsv" };
-		writeResultCells(bestResult, counts, helpers, cellResultWithEscapeVariants);
+		writeResultCells(bestResult, counts, helpers, phasesAreMatPat, cellResultWithEscapeVariants);
 	}
 	{
 		std::ofstream cellResult { outputPrefix + ".cells.tsv" };
-		writeResultCellOnlyNonescapeVariants(bestResult, counts, helpers, cellResult);
+		writeResultCellOnlyNonescapeVariants(bestResult, counts, helpers, phasesAreMatPat, cellResult);
 	}
 }
