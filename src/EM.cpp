@@ -8,6 +8,7 @@
 #include <cassert>
 #include <random>
 #include <algorithm>
+#include <cxxopts.hpp>
 
 const double epsilon = 0.0001; // comparisons should be strict but add an epsilon because of float rounding issues
 const double escapeBoundary = 0.001; // bounds X-chromosome inactivation escape to 0+this .. 1-this
@@ -895,6 +896,7 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 std::unordered_map<size_t, bool> readForcedVariantPhases(const std::string& filename, const EMHelperVariables& helpers)
 {
 	std::unordered_map<size_t, bool> forcedVariants;
+	if (filename == "") return forcedVariants;
 	std::ifstream file { filename };
 	size_t totalForcedVariants = 0;
 	while (file.good())
@@ -1021,14 +1023,61 @@ std::vector<size_t> loadSecondStepVariants(const std::string& annotationFile, co
 
 int main(int argc, char** argv)
 {
-	std::string matchTableFile { argv[1] };
-	std::string forcedPhaseFile { argv[2] };
-	size_t randomSeed = std::stoull(argv[3]);
-	size_t numTries = std::stoull(argv[4]);
-	std::string annotationFile { argv[5] };
-	std::string secondStepGeneList { argv[6] };
-	double initialNoiseMagnitude = std::stod(argv[7]);
-	double noiseDecay = std::stod(argv[8]);
+	cxxopts::Options options { "XCIE-EM" };
+	options.add_options()
+		("h,help", "Print help")
+		("v,version", "Print version")
+		("input-table", "Input table of cell/variant matches", cxxopts::value<std::string>())
+		("o,out", "Output prefix", cxxopts::value<std::string>()->default_value("./result"))
+		("force-phase", "File with pre-phased trio variants", cxxopts::value<std::string>())
+		("noise-magnitude", "initial EM noise magnitude", cxxopts::value<double>()->default_value("20"))
+		("noise-decay", "EM noise decay", cxxopts::value<double>()->default_value("0.95"))
+		("random-seed", "Random seed for EM initialization", cxxopts::value<size_t>()->default_value("1"))
+		("num-runs", "Number of runs for EM", cxxopts::value<size_t>()->default_value("10"))
+	;
+	auto params = options.parse(argc, argv);
+	if (params.count("v") == 1)
+	{
+		std::cerr << "Version: " << VERSION << std::endl;
+		std::exit(0);
+	}
+	if (params.count("h") == 1)
+	{
+		std::cerr << options.help() << std::endl;
+		std::exit(0);
+	}
+	bool paramError = false;
+	if (params.count("input-table") == 0)
+	{
+		std::cerr << "Input table is required" << std::endl;
+		paramError = true;
+	}
+	if (params["noise-decay"].as<double>() >= 1.0)
+	{
+		std::cerr << "Noise decay must be less than 1" << std::endl;
+		paramError = true;
+	}
+	if (params["noise-magnitude"].as<double>() < 0)
+	{
+		std::cerr << "Noise magnitude must be 0 or positive" << std::endl;
+		paramError = true;
+	}
+	if (paramError)
+	{
+		std::abort();
+	}
+	std::string matchTableFile = params["input-table"].as<std::string>();
+	std::string forcedPhaseFile = "";
+	if (params.count("force-phase") > 0)
+	{
+		forcedPhaseFile = params["force-phase"].as<std::string>();
+	}
+	size_t randomSeed = params["random-seed"].as<size_t>();
+	size_t numTries = params["num-runs"].as<size_t>();
+//	std::string annotationFile { argv[5] };
+//	std::string secondStepGeneList { argv[6] };
+	double initialNoiseMagnitude = params["noise-magnitude"].as<double>();
+	double noiseDecay = params["noise-decay"].as<double>();
 //	std::cerr << "read match counts" << std::endl;
 	std::vector<CellMatch> counts = readMatchCounts(matchTableFile);
 //	std::cerr << "get helper variables" << std::endl;
@@ -1039,7 +1088,8 @@ int main(int argc, char** argv)
 	double bestScore = -100000.0;
 	EMResult bestResult;
 //	std::cerr << "read second step genes" << std::endl;
-	std::vector<size_t> secondStepVariants = loadSecondStepVariants(annotationFile, secondStepGeneList, helpers);
+	std::vector<size_t> secondStepVariants;
+//	std::vector<size_t> secondStepVariants = loadSecondStepVariants(annotationFile, secondStepGeneList, helpers);
 //	std::cerr << secondStepVariants.size() << " second step variants" << std::endl;
 	for (size_t iteration = 0; iteration < numTries; iteration++)
 	{
