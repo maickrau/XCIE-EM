@@ -19,6 +19,8 @@ First run [scReadCounts](https://horvathlab.github.io/NGS/SCReadCounts/) to coun
 XCIE-EM --input-screadcounts screadcounts.output.tsv --output-prefix EM_output --exclude-PAR --exclude-XIST-grch38
 ```
 
+This will estimate the variant phases and active chrX per cell. The output is written to files which start with `EM_output`. See the section [output](#output) for explanations of all the output files.
+
 The parameters `--exclude-PAR` `--exclude-XIST-grch38` are not mandatory but they improve the results by removing the PAR and XIST regions, which are difficult to phase from chrX inactivation. For other references you can also use `--exclude-XIST-grch37` or `--exclude-XIST-chm13` or manually with `--exclude-region`.
 
 ### Output
