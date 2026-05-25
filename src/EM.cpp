@@ -1043,7 +1043,7 @@ int main(int argc, char** argv)
 //	std::cerr << secondStepVariants.size() << " second step variants" << std::endl;
 	for (size_t iteration = 0; iteration < numTries; iteration++)
 	{
-		std::cerr << "bigiteration " << iteration << std::endl;
+		std::cerr << "EM run " << (iteration+1) << "/" << numTries << std::endl;
 //		std::cerr << "initialize" << std::endl;
 		EMResult result = initializeResult(helpers);
 		size_t randomSeedHere = randomSeed + iteration;
