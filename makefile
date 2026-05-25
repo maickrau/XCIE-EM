@@ -10,9 +10,9 @@ VERSION := Git branch $(shell git rev-parse --abbrev-ref HEAD) commit $(shell gi
 $(shell mkdir -p bin)
 $(shell mkdir -p obj)
 
-all: $(BINDIR)/EM
+all: $(BINDIR)/XCIE-EM
 
-$(BINDIR)/EM: src/EM.cpp
+$(BINDIR)/XCIE-EM: src/EM.cpp
 	$(GPP) -o $@ $^ $(CPPFLAGS) -DVERSION="\"$(VERSION)\""
 
 clean:
