@@ -13,7 +13,7 @@ make all
 
 ### Running
 
-First run (scReadCounts)[https://horvathlab.github.io/NGS/SCReadCounts/] to count the ref/alt coverage per variant per cell. Then run:
+First run [scReadCounts](https://horvathlab.github.io/NGS/SCReadCounts/) to count the ref/alt coverage per variant per cell. Then run:
 
 ```
 XCIE-EM --input-screadcounts screadcounts.output.tsv --output-prefix EM_output --exclude-PAR --exclude-XIST-grch38
