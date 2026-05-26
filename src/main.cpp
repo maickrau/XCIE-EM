@@ -5,6 +5,7 @@
 #include "Logger.h"
 #include "EM.h"
 #include "Common.h"
+#include "AlleleSpecificExpression.h"
 
 int main(int argc, char** argv)
 {
@@ -15,6 +16,7 @@ int main(int argc, char** argv)
 		("input-screadcounts", "Input scReadCounts cell/variant match table", cxxopts::value<std::string>())
 		("input-preprocessed-table", "Input prerocessed table of cell/variant matches", cxxopts::value<std::string>())
 		("o,output-prefix", "Output prefix", cxxopts::value<std::string>()->default_value("./result"))
+		("annotation-gff3", "Calculate gene level pseudobulk values based on gene annotations in this file", cxxopts::value<std::string>())
 		("force-phase", "File with pre-phased trio variants", cxxopts::value<std::string>())
 		("EM-noise-magnitude", "initial EM noise magnitude", cxxopts::value<double>()->default_value("20"))
 		("EM-noise-decay", "EM noise decay", cxxopts::value<double>()->default_value("0.95"))
@@ -85,6 +87,11 @@ int main(int argc, char** argv)
 		std::abort();
 	}
 	Logger::Log.setVerbosity(params.count("verbose"));
+	std::string annotationGff3;
+	if (params.count("annotation-gff3") == 1)
+	{
+		annotationGff3 = params["annotation-gff3"].as<std::string>();
+	}
 	std::string outputPrefix = params["o"].as<std::string>();
 	std::string forcedPhaseFile = "";
 	if (params.count("force-phase") > 0)
@@ -172,8 +179,16 @@ int main(int argc, char** argv)
 		std::ofstream cellResult { outputPrefix + ".cells.tsv" };
 		writeResultCellOnlyNonescapeVariants(output, phasesAreMatPat, cellResult);
 	}
-	auto pseudobulk2 = getVariantPseudobulk(output, cellMatches, 2);
-	writePseudobulkVariantResults(pseudobulk2, phasesAreMatPat, outputPrefix + ".pseudobulk.variants.confidence2.tsv");
-	auto pseudobulk0 = getVariantPseudobulk(output, cellMatches, 0);
-	writePseudobulkVariantResults(pseudobulk0, phasesAreMatPat, outputPrefix + ".pseudobulk.variants.confidence0.tsv");
+	auto pseudobulkVariants2 = getVariantPseudobulk(output, cellMatches, 2);
+	writePseudobulkResults(pseudobulkVariants2, phasesAreMatPat, outputPrefix + ".pseudobulk.variants.confidence2.tsv");
+	auto pseudobulkVariants0 = getVariantPseudobulk(output, cellMatches, 0);
+	writePseudobulkResults(pseudobulkVariants0, phasesAreMatPat, outputPrefix + ".pseudobulk.variants.confidence0.tsv");
+	if (annotationGff3 != "")
+	{
+		auto annotation = getGeneInfo(annotationGff3, true);
+		auto genePseudobulk2 = getGenePseudobulk(pseudobulkVariants2, annotation);
+		writePseudobulkResults(genePseudobulk2, phasesAreMatPat, outputPrefix + ".pseudobulk.genes.confidence2.tsv");
+		auto genePseudobulk0 = getGenePseudobulk(pseudobulkVariants0, annotation);
+		writePseudobulkResults(genePseudobulk2, phasesAreMatPat, outputPrefix + ".pseudobulk.genes.confidence0.tsv");
+	}
 }

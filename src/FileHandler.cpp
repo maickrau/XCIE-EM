@@ -147,15 +147,15 @@ void writeResultVariants(const EMOutput& result, const bool phasesAreMatPat, std
 	}
 }
 
-void writePseudobulkVariantResults(const std::vector<PseudobulkVariantInfo>& variantPseudobulk, const bool phasesAreMatPat, const std::string filename)
+void writePseudobulkResults(const std::vector<PseudobulkInfo>& pseudobulk, const bool phasesAreMatPat, const std::string filename)
 {
 	const std::string matName = matHapName(phasesAreMatPat);
 	const std::string patName = patHapName(phasesAreMatPat);
 	std::ofstream file { filename };
 	file << "variant\t" << matName << "_active_expression" << "\t" << matName << "_inactive_expression" << "\t" << patName << "_active_expression" << "\t" << patName << "_inactive_expression" << std::endl;
-	for (const auto& t : variantPseudobulk)
+	for (const auto& t : pseudobulk)
 	{
-		file << t.variantName << "\t" << t.matXa << "\t" << t.matXi << "\t" << t.patXa << "\t" << t.patXi << std::endl;
+		file << t.name << "\t" << t.matXa << "\t" << t.matXi << "\t" << t.patXa << "\t" << t.patXi << std::endl;
 	}
 }
 

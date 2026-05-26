@@ -4,15 +4,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-
-struct CellMatch
-{
-public:
-	std::string cell;
-	std::string variant;
-	bool alt;
-	size_t count;
-};
+#include "AlleleSpecificExpression.h"
 
 struct EMResultAdditions
 {
@@ -59,19 +51,6 @@ public:
 	EMResultAdditions additions;
 };
 
-struct PseudobulkVariantInfo
-{
-public:
-	std::string variantName;
-	size_t matXa;
-	size_t matXi;
-	size_t patXa;
-	size_t patXi;
-};
-
-std::vector<CellMatch> filterOutHomozygousSites(const std::vector<CellMatch>& raw);
-std::vector<CellMatch> excludeRegions(const std::vector<CellMatch>& raw, const std::vector<std::pair<size_t, size_t>>& excludedRegions);
 EMOutput runEM(const std::vector<CellMatch>& cellMatches, const std::unordered_map<std::string, bool>& forcedPhases, const size_t randomSeed, const double initialNoiseMagnitude, const double noiseDecay, const size_t numTries);
-std::vector<PseudobulkVariantInfo> getVariantPseudobulk(const EMOutput& output, const std::vector<CellMatch>& cellMatches, const double minConfidence);
 
 #endif

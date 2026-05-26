@@ -5,10 +5,10 @@ ODIR=obj
 BINDIR=bin
 SRCDIR=src
 
-_DEPS = Logger.h Common.h FileHandler.h EM.h
+_DEPS = Logger.h Common.h FileHandler.h EM.h AlleleSpecificExpression.h
 DEPS = $(patsubst %, $(SRCDIR)/%, $(_DEPS))
 
-_OBJ = main.o Logger.o Common.o FileHandler.o EM.o
+_OBJ = main.o Logger.o Common.o FileHandler.o EM.o AlleleSpecificExpression.o
 OBJ = $(patsubst %, $(ODIR)/%, $(_OBJ))
 
 VERSION := Git branch $(shell git rev-parse --abbrev-ref HEAD) commit $(shell git rev-parse HEAD) $(shell git show -s --format=%ci)

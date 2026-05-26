@@ -14,6 +14,7 @@
 #include "EM.h"
 #include "Common.h"
 #include "FileHandler.h"
+#include "AlleleSpecificExpression.h"
 
 const double epsilon = 0.0001; // comparisons should be strict but add an epsilon because of float rounding issues
 const double escapeBoundary = 0.001; // bounds X-chromosome inactivation escape to 0+this .. 1-this
@@ -50,32 +51,6 @@ size_t getCount(const std::vector<std::unordered_map<size_t, size_t>>& cellVaria
 {
 	if (cellVariantCount[cell].count(variant) == 0) return 0;
 	return cellVariantCount[cell].at(variant);
-}
-
-std::vector<CellMatch> filterOutHomozygousSites(const std::vector<CellMatch>& raw)
-{
-	const double minMinorAlleleRatio = 0.2;
-	std::unordered_map<std::string, size_t> variantRefCount;
-	std::unordered_map<std::string, size_t> variantAltCount;
-	for (const auto& match : raw)
-	{
-		if (match.alt)
-		{
-			variantAltCount[match.variant] += match.count;
-		}
-		else
-		{
-			variantRefCount[match.variant] += match.count;
-		}
-	}
-	std::vector<CellMatch> result;
-	for (const auto& match : raw)
-	{
-		if ((double)variantRefCount[match.variant] < (double)variantAltCount[match.variant] * minMinorAlleleRatio) continue;
-		if ((double)variantAltCount[match.variant] < (double)variantRefCount[match.variant] * minMinorAlleleRatio) continue;
-		result.emplace_back(match);
-	}
-	return result;
 }
 
 void initializeRandomly(EMResult& result, const std::unordered_map<size_t, bool>& forcedPhases, const size_t randomSeed)
@@ -597,76 +572,6 @@ std::pair<double, double> getCellEscapeConfidenceInterval(const EMResult& result
 	return std::make_pair(minResult, maxResult);
 }
 
-std::vector<PseudobulkVariantInfo> getVariantPseudobulk(const EMOutput& output, const std::vector<CellMatch>& cellMatches, const double minConfidence)
-{
-	std::unordered_map<size_t, size_t> variantCoverageMatXa;
-	std::unordered_map<size_t, size_t> variantCoverageMatXi;
-	std::unordered_map<size_t, size_t> variantCoveragePatXa;
-	std::unordered_map<size_t, size_t> variantCoveragePatXi;
-	std::unordered_set<size_t> includedVariants;
-	std::vector<bool> ignoreNothing;
-	ignoreNothing.resize(output.helpers.numVariants(), false);
-	for (size_t variantIndex = 0; variantIndex < output.helpers.numVariants(); variantIndex++)
-	{
-		const bool matRef = output.result.variantIsMatRef[variantIndex];
-		double matXe, patXe;
-		std::tie(matXe, patXe) = getOptimalVariantXe(output.result, output.helpers, variantIndex);
-		double phaseScoreDifference = getVariantLogProbs(output.result, output.helpers, variantIndex, matRef ? matXe : patXe, matRef);
-		phaseScoreDifference -= getVariantLogProbs(output.result, output.helpers, variantIndex, matRef ? patXe : matXe, !matRef);
-		if (phaseScoreDifference < minConfidence) continue;
-		includedVariants.insert(variantIndex);
-	}
-	std::unordered_set<size_t> includedCells;
-	for (size_t cellIndex = 0; cellIndex < output.helpers.numCells(); cellIndex++)
-	{
-		const bool matActive = output.result.cellIsMatActive[cellIndex];
-		double matCe, patCe;
-		std::tie(matCe, patCe) = getOptimalCellCe(output.result, output.helpers, cellIndex, ignoreNothing);
-		double scoreDifference = getCellLogProb(output.result, output.helpers, cellIndex, matActive ? matCe : patCe, matActive, ignoreNothing);
-		scoreDifference -= getCellLogProb(output.result, output.helpers, cellIndex, matActive ? patCe : matCe, !matActive, ignoreNothing);
-		if (scoreDifference < minConfidence) continue;
-		includedCells.insert(cellIndex);
-	}
-	for (const auto& t : cellMatches)
-	{
-		const size_t variantIndex = output.helpers.variantNameToIndex.at(t.variant);
-		const size_t cellIndex = output.helpers.cellNameToIndex.at(t.cell);
-		if (includedVariants.count(variantIndex) == 0) continue;
-		if (includedCells.count(cellIndex) == 0) continue;
-		bool activeCoverage = (output.result.variantIsMatRef[variantIndex] == output.result.cellIsMatActive[cellIndex]) == (!t.alt);
-		if (activeCoverage && output.result.cellIsMatActive[cellIndex])
-		{
-			variantCoverageMatXa[variantIndex] += t.count;
-		}
-		if (!activeCoverage && output.result.cellIsMatActive[cellIndex])
-		{
-			variantCoverageMatXi[variantIndex] += t.count;
-		}
-		if (activeCoverage && !output.result.cellIsMatActive[cellIndex])
-		{
-			variantCoveragePatXa[variantIndex] += t.count;
-		}
-		if (!activeCoverage && !output.result.cellIsMatActive[cellIndex])
-		{
-			variantCoveragePatXi[variantIndex] += t.count;
-		}
-	}
-	std::vector<std::string> variantOrder = getVariantOrder(output.helpers.variantNameToIndex);
-	std::vector<PseudobulkVariantInfo> result;
-	result.reserve(output.helpers.numVariants());
-	for (const std::string& name : variantOrder)
-	{
-		size_t index = output.helpers.variantNameToIndex.at(name);
-		result.emplace_back();
-		result.back().variantName = name;
-		result.back().matXa = variantCoverageMatXa[index];
-		result.back().matXi = variantCoverageMatXi[index];
-		result.back().patXa = variantCoveragePatXa[index];
-		result.back().patXi = variantCoveragePatXi[index];
-	}
-	return result;
-}
-
 EMHelperVariables getHelpers(const std::vector<CellMatch>& cellMatches)
 {
 	EMHelperVariables helpers;
@@ -784,26 +689,6 @@ EMResult initializeResult(const EMHelperVariables& helpers)
 	result.variantEscapeFraction.resize(helpers.numVariants(), -1);
 	result.cellIsMatActive.resize(helpers.numCells(), false);
 	result.cellEscapeFraction.resize(helpers.numCells(), -1);
-	return result;
-}
-
-std::vector<CellMatch> excludeRegions(const std::vector<CellMatch>& raw, const std::vector<std::pair<size_t, size_t>>& excludedRegions)
-{
-	std::vector<CellMatch> result;
-	for (const auto& t : raw)
-	{
-		size_t variantPos = parseVariantPosition(t.variant);
-		bool excluded = false;
-		for (const auto& region : excludedRegions)
-		{
-			if (region.first > variantPos) break;
-			if (region.second < variantPos) continue;
-			excluded = true;
-			break;
-		}
-		if (excluded) continue;
-		result.emplace_back(t);
-	}
 	return result;
 }
 
