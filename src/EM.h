@@ -47,6 +47,8 @@ public:
 	std::vector<std::unordered_map<size_t, size_t>> cellVariantAltCount;
 	std::vector<std::vector<size_t>> activeCellsPerVariant;
 	std::vector<std::vector<size_t>> activeVariantsPerCell;
+	size_t numVariants() const;
+	size_t numCells() const;
 };
 
 struct EMOutput

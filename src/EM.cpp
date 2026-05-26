@@ -36,6 +36,16 @@ private:
 	std::normal_distribution<> normalDistribution;
 };
 
+size_t EMHelperVariables::numVariants() const
+{
+	return variantNameToIndex.size();
+}
+
+size_t EMHelperVariables::numCells() const
+{
+	return cellNameToIndex.size();
+}
+
 size_t getCount(const std::vector<std::unordered_map<size_t, size_t>>& cellVariantCount, const size_t cell, const size_t variant)
 {
 	if (cellVariantCount[cell].count(variant) == 0) return 0;
@@ -525,7 +535,7 @@ double getTotalLogProb(const EMResult& result, const EMHelperVariables& helpers,
 double getTotalLogProb(const EMResult& result, const EMHelperVariables& helpers)
 {
 	std::vector<bool> empty;
-	empty.resize(helpers.variantNameToIndex.size(), false);
+	empty.resize(helpers.numVariants(), false);
 	return getNonnormalizedTotalLogProb(result, helpers, empty);
 }
 
@@ -595,8 +605,8 @@ std::vector<PseudobulkVariantInfo> getVariantPseudobulk(const EMOutput& output, 
 	std::unordered_map<size_t, size_t> variantCoveragePatXi;
 	std::unordered_set<size_t> includedVariants;
 	std::vector<bool> ignoreNothing;
-	ignoreNothing.resize(output.helpers.variantNameToIndex.size(), false);
-	for (size_t variantIndex = 0; variantIndex < output.helpers.variantNameToIndex.size(); variantIndex++)
+	ignoreNothing.resize(output.helpers.numVariants(), false);
+	for (size_t variantIndex = 0; variantIndex < output.helpers.numVariants(); variantIndex++)
 	{
 		const bool matRef = output.result.variantIsMatRef[variantIndex];
 		double matXe, patXe;
@@ -607,7 +617,7 @@ std::vector<PseudobulkVariantInfo> getVariantPseudobulk(const EMOutput& output, 
 		includedVariants.insert(variantIndex);
 	}
 	std::unordered_set<size_t> includedCells;
-	for (size_t cellIndex = 0; cellIndex < output.helpers.cellNameToIndex.size(); cellIndex++)
+	for (size_t cellIndex = 0; cellIndex < output.helpers.numCells(); cellIndex++)
 	{
 		const bool matActive = output.result.cellIsMatActive[cellIndex];
 		double matCe, patCe;
@@ -643,7 +653,7 @@ std::vector<PseudobulkVariantInfo> getVariantPseudobulk(const EMOutput& output, 
 	}
 	std::vector<std::string> variantOrder = getVariantOrder(output.helpers.variantNameToIndex);
 	std::vector<PseudobulkVariantInfo> result;
-	result.reserve(output.helpers.variantNameToIndex.size());
+	result.reserve(output.helpers.numVariants());
 	for (const std::string& name : variantOrder)
 	{
 		size_t index = output.helpers.variantNameToIndex.at(name);
@@ -664,22 +674,22 @@ EMHelperVariables getHelpers(const std::vector<CellMatch>& cellMatches)
 	{
 		if (helpers.variantNameToIndex.count(t.variant) == 0)
 		{
-			size_t index = helpers.variantNameToIndex.size();
+			size_t index = helpers.numVariants();
 			helpers.variantNameToIndex[t.variant] = index;
 		}
 		if (helpers.cellNameToIndex.count(t.cell) == 0)
 		{
-			size_t index = helpers.cellNameToIndex.size();
+			size_t index = helpers.numCells();
 			helpers.cellNameToIndex[t.cell] = index;
 		}
 	}
-	helpers.activeCellsPerVariant.resize(helpers.variantNameToIndex.size());
-	helpers.activeVariantsPerCell.resize(helpers.cellNameToIndex.size());
-	helpers.variantCoverage.resize(helpers.variantNameToIndex.size(), 0);
-	helpers.cellCoverage.resize(helpers.cellNameToIndex.size(), 0);
-	helpers.cellVariantAltCount.resize(helpers.cellNameToIndex.size());
-	helpers.cellVariantRefCount.resize(helpers.cellNameToIndex.size());
-	helpers.cellCoverageFraction.resize(helpers.cellNameToIndex.size(), 0);
+	helpers.activeCellsPerVariant.resize(helpers.numVariants());
+	helpers.activeVariantsPerCell.resize(helpers.numCells());
+	helpers.variantCoverage.resize(helpers.numVariants(), 0);
+	helpers.cellCoverage.resize(helpers.numCells(), 0);
+	helpers.cellVariantAltCount.resize(helpers.numCells());
+	helpers.cellVariantRefCount.resize(helpers.numCells());
+	helpers.cellCoverageFraction.resize(helpers.numCells(), 0);
 	for (const auto& t : cellMatches)
 	{
 		const size_t variantIndex = helpers.variantNameToIndex.at(t.variant);
@@ -725,10 +735,10 @@ EMHelperVariables getHelpers(const std::vector<CellMatch>& cellMatches)
 
 void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cellMatches, const std::unordered_map<size_t, bool>& forcedPhases, const EMHelperVariables& helpers, const size_t noiseSeed, const double initialNoiseMagnitude, const double noiseDecay)
 {
-	assert(result.variantIsMatRef.size() == helpers.variantNameToIndex.size());
-	assert(result.variantEscapeFraction.size() == helpers.variantNameToIndex.size());
-	assert(result.cellIsMatActive.size() == helpers.cellNameToIndex.size());
-	assert(result.cellEscapeFraction.size() == helpers.cellNameToIndex.size());
+	assert(result.variantIsMatRef.size() == helpers.numVariants());
+	assert(result.variantEscapeFraction.size() == helpers.numVariants());
+	assert(result.cellIsMatActive.size() == helpers.numCells());
+	assert(result.cellEscapeFraction.size() == helpers.numCells());
 	size_t iteration = 0;
 	double logprob = getTotalLogProb(result, helpers);
 	Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << "initial non-normalized log likelihood sum " << logprob << std::endl;
@@ -736,7 +746,7 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 	noise.initializeSeed(noiseSeed);
 	noise.magnitude = initialNoiseMagnitude;
 	std::vector<bool> ignoreNothing;
-	ignoreNothing.resize(helpers.variantNameToIndex.size(), false);
+	ignoreNothing.resize(helpers.numVariants(), false);
 	while (true)
 	{
 		bool variantChanged = maximizeVariantStates(result, forcedPhases, helpers, ignoreNothing, noise);
@@ -770,10 +780,10 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 EMResult initializeResult(const EMHelperVariables& helpers)
 {
 	EMResult result;
-	result.variantIsMatRef.resize(helpers.variantNameToIndex.size(), false);
-	result.variantEscapeFraction.resize(helpers.variantNameToIndex.size(), -1);
-	result.cellIsMatActive.resize(helpers.cellNameToIndex.size(), false);
-	result.cellEscapeFraction.resize(helpers.cellNameToIndex.size(), -1);
+	result.variantIsMatRef.resize(helpers.numVariants(), false);
+	result.variantEscapeFraction.resize(helpers.numVariants(), -1);
+	result.cellIsMatActive.resize(helpers.numCells(), false);
+	result.cellEscapeFraction.resize(helpers.numCells(), -1);
 	return result;
 }
 
@@ -800,23 +810,23 @@ std::vector<CellMatch> excludeRegions(const std::vector<CellMatch>& raw, const s
 EMResultAdditions getEMAdditions(const std::vector<CellMatch>& cellMatches, const EMResult& result, const EMHelperVariables& helpers)
 {
 	EMResultAdditions additions;
-	additions.variantPhaseConfidence.resize(helpers.variantNameToIndex.size(), 0);
-	additions.variantEscapeCILow.resize(helpers.variantNameToIndex.size(), 0);
-	additions.variantEscapeCIHigh.resize(helpers.variantNameToIndex.size(), 0);
-	additions.cellActiveConfidence.resize(helpers.cellNameToIndex.size(), 0);
-	additions.cellActiveConfidenceOnlyNonescape.resize(helpers.cellNameToIndex.size(), 0);
-	additions.cellEscapeCILow.resize(helpers.cellNameToIndex.size(), 0);
-	additions.cellEscapeCIHigh.resize(helpers.cellNameToIndex.size(), 0);
+	additions.variantPhaseConfidence.resize(helpers.numVariants(), 0);
+	additions.variantEscapeCILow.resize(helpers.numVariants(), 0);
+	additions.variantEscapeCIHigh.resize(helpers.numVariants(), 0);
+	additions.cellActiveConfidence.resize(helpers.numCells(), 0);
+	additions.cellActiveConfidenceOnlyNonescape.resize(helpers.numCells(), 0);
+	additions.cellEscapeCILow.resize(helpers.numCells(), 0);
+	additions.cellEscapeCIHigh.resize(helpers.numCells(), 0);
 	std::vector<bool> ignoreNothing;
-	ignoreNothing.resize(helpers.variantNameToIndex.size(), false);
+	ignoreNothing.resize(helpers.numVariants(), false);
 	std::vector<bool> ignoreEscapeVariants;
-	ignoreEscapeVariants.resize(helpers.variantNameToIndex.size(), false);
+	ignoreEscapeVariants.resize(helpers.numVariants(), false);
 	for (size_t i = 0 ; i < result.variantEscapeFraction.size(); i++)
 	{
 		if (result.variantEscapeFraction[i] <= escapeBoundary + epsilon) continue;
 		ignoreEscapeVariants[i] = true;
 	}
-	for (size_t variantIndex = 0; variantIndex < helpers.variantNameToIndex.size(); variantIndex++)
+	for (size_t variantIndex = 0; variantIndex < helpers.numVariants(); variantIndex++)
 	{
 		const bool matRef = result.variantIsMatRef[variantIndex];
 		double matXe, patXe;
@@ -829,7 +839,7 @@ EMResultAdditions getEMAdditions(const std::vector<CellMatch>& cellMatches, cons
 		additions.variantEscapeCILow[variantIndex] = escapeConfidenceIntervalMin;
 		additions.variantEscapeCIHigh[variantIndex] = escapeConfidenceIntervalMax;
 	}
-	for (size_t cellIndex = 0; cellIndex < helpers.cellNameToIndex.size(); cellIndex++)
+	for (size_t cellIndex = 0; cellIndex < helpers.numCells(); cellIndex++)
 	{
 		const bool matActive = result.cellIsMatActive[cellIndex];
 		double matCe, patCe;
@@ -842,7 +852,7 @@ EMResultAdditions getEMAdditions(const std::vector<CellMatch>& cellMatches, cons
 		additions.cellEscapeCILow[cellIndex] = escapeConfidenceIntervalMin;
 		additions.cellEscapeCIHigh[cellIndex] = escapeConfidenceIntervalMax;
 	}
-	for (size_t cellIndex = 0; cellIndex < helpers.cellNameToIndex.size(); cellIndex++)
+	for (size_t cellIndex = 0; cellIndex < helpers.numCells(); cellIndex++)
 	{
 		const bool matActive = result.cellIsMatActive[cellIndex];
 		double matCe, patCe;
