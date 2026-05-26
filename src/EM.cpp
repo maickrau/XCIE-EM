@@ -11,6 +11,7 @@
 #include <random>
 #include <algorithm>
 #include <cxxopts.hpp>
+#include "Logger.h"
 
 const double epsilon = 0.0001; // comparisons should be strict but add an epsilon because of float rounding issues
 const double escapeBoundary = 0.001; // bounds X-chromosome inactivation escape to 0+this .. 1-this
@@ -585,7 +586,7 @@ bool maximizeVariantStates(EMResult& result, const std::unordered_map<size_t, bo
 			result.variantEscapeFraction[variant] = patXe;
 		}
 	}
-//	std::cerr << phasesChanged << " variant phases changed, " << escapeChanged << " variant escapes changed" << std::endl;
+	Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << phasesChanged << " variant phases changed, " << escapeChanged << " variant escapes changed" << std::endl;
 	return changed;
 }
 
@@ -638,7 +639,7 @@ bool maximizeCellStates(EMResult& result, const EMHelperVariables& helpers, cons
 			result.cellEscapeFraction[cell] = patCe;
 		}
 	}
-//	std::cerr << cellsChanged << " cell actives changed, " << escapeChanged << " cell escapes changed" << std::endl;
+	Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << cellsChanged << " cell actives changed, " << escapeChanged << " cell escapes changed" << std::endl;
 	return changed;
 }
 
@@ -1039,7 +1040,7 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 	double logprob = getTotalLogProb(result, helpers);
 	std::vector<bool> ignoreTheseVariantsForNow = getIgnoredSecondStepVariants(helpers, secondStepVariants);
 //	std::cerr << ignoreTheseVariantsForNow.size() << " variants ignored in first step" << std::endl;
-//	std::cerr << "initial non-normalized log likelihood sum " << logprob << std::endl;
+	Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << "initial non-normalized log likelihood sum " << logprob << std::endl;
 	NoiseMaker noise;
 	noise.initializeSeed(noiseSeed);
 	noise.magnitude = initialNoiseMagnitude;
@@ -1049,13 +1050,13 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 		if (variantChanged)
 		{
 			logprob = getTotalLogProb(result, helpers, ignoreTheseVariantsForNow);
-//			std::cerr << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
+			Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
 		}
 		bool cellChanged = maximizeCellStates(result, helpers, ignoreTheseVariantsForNow, noise);
 		if (cellChanged)
 		{
 			logprob = getTotalLogProb(result, helpers, ignoreTheseVariantsForNow);
-//			std::cerr << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
+			Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
 		}
 		iteration += 1;
 		if (!cellChanged && !variantChanged)
@@ -1071,14 +1072,14 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 			}
 			ignoreTheseVariantsForNow.clear();
 
-//			std::cerr << "switch to second step" << std::endl;
-//			logprob = getTotalLogProb(result, helpers, ignoreTheseVariantsForNow);
-//			std::cerr << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
+			Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << "switch to second step" << std::endl;
+			logprob = getTotalLogProb(result, helpers, ignoreTheseVariantsForNow);
+			Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
 		}
 		noise.magnitude *= noiseDecay;
 	}
 	logprob = getTotalLogProb(result, helpers);
-	std::cerr << "final non-normalized log likelihood sum " << logprob << std::endl;
+	Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << "final non-normalized log likelihood sum " << logprob << std::endl;
 }
 
 std::unordered_map<size_t, bool> readForcedVariantPhases(const std::string& filename, const EMHelperVariables& helpers)
@@ -1108,7 +1109,7 @@ std::unordered_map<size_t, bool> readForcedVariantPhases(const std::string& file
 			forcedVariants[helpers.variantNameToIndex.at(variant)] = false;
 		}
 	}
-//	std::cerr << "total forced variants " << totalForcedVariants << ", overlap with real variants " << forcedVariants.size() << std::endl;
+	Logger::Log.log(Logger::LogLevel::DebugInfo) << "total forced variants " << totalForcedVariants << ", overlap with real variants " << forcedVariants.size() << std::endl;
 	return forcedVariants;
 }
 
@@ -1274,6 +1275,7 @@ int main(int argc, char** argv)
 		("exclude-XIST-grch38", "Exclude the XIST and TSIX genes in grch38 coordinates. Equivalent to \"--exclude-region chrX:73792204-73852753\"")
 		("exclude-XIST-grch37", "Exclude the XIST and TSIX genes in grch37 coordinates. Equivalent to \"--exclude-region chrX:73012040-73072588\"")
 		("exclude-XIST-chm13", "Exclude the XIST and TSIX genes in chm13 coordinates. Equivalent to \"--exclude-region chrX:72225527-72286069\"")
+		("verbose", "Print more information while running")
 	;
 	cxxopts::ParseResult params;
 	try
@@ -1332,6 +1334,7 @@ int main(int argc, char** argv)
 	{
 		std::abort();
 	}
+	Logger::Log.setVerbosity(params.count("verbose"));
 	std::string outputPrefix = params["o"].as<std::string>();
 	std::string forcedPhaseFile = "";
 	if (params.count("force-phase") > 0)
@@ -1344,7 +1347,6 @@ int main(int argc, char** argv)
 //	std::string secondStepGeneList { argv[6] };
 	double initialNoiseMagnitude = params["EM-noise-magnitude"].as<double>();
 	double noiseDecay = params["EM-noise-decay"].as<double>();
-//	std::cerr << "read match counts" << std::endl;
 	std::vector<CellMatch> counts;
 	std::vector<std::pair<size_t, size_t>> excludedRegions;
 	if (params.count("exclude-region") > 0)
@@ -1377,28 +1379,34 @@ int main(int argc, char** argv)
 	if (params.count("input-preprocessed-table") > 0)
 	{
 		std::string matchTableFile = params["input-preprocessed-table"].as<std::string>();
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "read preprocessed counts from file " << matchTableFile << std::endl;
 		counts = readMatchCounts(matchTableFile);
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << counts.size() << " count items" << std::endl;
 	}
 	if (params.count("input-screadcounts") > 0)
 	{
 		std::string scReadCountsFile = params["input-screadcounts"].as<std::string>();
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "read screadcounts from file " << scReadCountsFile << std::endl;
 		counts = readScReadCountsMatchCounts(scReadCountsFile);
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << counts.size() << " count items" << std::endl;
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "filter out homozygous sites" << std::endl;
 		counts = filterOutHomozygousSites(counts);
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << counts.size() << " count items" << std::endl;
 	}
 	if (excludedRegions.size() > 0)
 	{
-		std::cerr << "excluding regions:";
+		Logger::Log.log(Logger::LogLevel::Always) << "excluding regions:";
 		for (auto t : excludedRegions)
 		{
-			std::cerr << " " << t.first << "-" << t.second;
+			Logger::Log.log(Logger::LogLevel::Always) << " " << t.first << "-" << t.second;
 		}
-		std::cerr << std::endl;
+		Logger::Log.log(Logger::LogLevel::Always) << std::endl;
 		counts = excludeRegions(counts, excludedRegions);
 	}
 	writeCellMatchCounts(counts, outputPrefix + ".preprocessed_matches.tsv");
-//	std::cerr << "get helper variables" << std::endl;
+	Logger::Log.log(Logger::LogLevel::DebugInfo) << "get helper variables" << std::endl;
 	EMHelperVariables helpers = getHelpers(counts);
-//	std::cerr << "read forced variant phases" << std::endl;
+	Logger::Log.log(Logger::LogLevel::DebugInfo) << "read forced variant phases" << std::endl;
 	auto forcedPhases = readForcedVariantPhases(forcedPhaseFile, helpers);
 	bool phasesAreMatPat = (forcedPhases.size() > 0);
 	std::vector<size_t> iterationsWithGoodScore;
@@ -1410,23 +1418,24 @@ int main(int argc, char** argv)
 //	std::cerr << secondStepVariants.size() << " second step variants" << std::endl;
 	for (size_t iteration = 0; iteration < numTries; iteration++)
 	{
-		std::cerr << "EM run " << (iteration+1) << "/" << numTries << std::endl;
-//		std::cerr << "initialize" << std::endl;
+		Logger::Log.log(Logger::LogLevel::Always) << "EM run " << (iteration+1) << "/" << numTries << std::endl;
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "initialize" << std::endl;
 		EMResult result = initializeResult(helpers);
 		size_t randomSeedHere = randomSeed + iteration;
-//		std::cerr << "initialize with random seed " << randomSeedHere << std::endl;
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "initialize with random seed " << randomSeedHere << std::endl;
 		initializeRandomly(result, forcedPhases, randomSeedHere);
-//		std::cerr << "run EM" << std::endl;
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "run EM" << std::endl;
 		getMaximumLikelihoodEM(result, counts, forcedPhases, helpers, secondStepVariants, randomSeedHere, initialNoiseMagnitude, noiseDecay);
-//		std::cerr << "write results" << std::endl;
 		double score = getTotalLogProb(result, helpers);
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "got score " << score << std::endl;
 		if (iteration == 0 || score > bestScore)
 		{
+			Logger::Log.log(Logger::LogLevel::DebugInfo) << "best so far" << std::endl;
 			bestScore = score;
 			bestResult = result;
 		}
 	}
-	std::cerr << "best score " << bestScore << std::endl;
+	Logger::Log.log(Logger::LogLevel::Always) << "best score " << bestScore << std::endl;
 	{
 		std::ofstream variantResult { outputPrefix + ".variants.tsv" };
 		writeResultVariants(bestResult, counts, helpers, phasesAreMatPat, variantResult);
