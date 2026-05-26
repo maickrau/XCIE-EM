@@ -1,3 +1,4 @@
+#include <cmath>
 #include <algorithm>
 #include <limits>
 #include <regex>
@@ -120,4 +121,42 @@ std::tuple<std::string, size_t, size_t> parseBedRegion(const std::string& region
 		}
 	}
 	return std::make_tuple<std::string, size_t, size_t>("", std::numeric_limits<size_t>::max(), std::numeric_limits<size_t>::max());
+}
+
+double logNChooseK(const size_t n, const size_t k)
+{
+	if (k > n-k) return logNChooseK(n, n-k);
+	double result = 0;
+	for (size_t i = 1; i <= k; i++)
+	{
+		result += log(n-k+i);
+		result -= log(i);
+	}
+	return result;
+}
+
+double getBinomialPValueGreaterThan(const double p, const size_t successes, const size_t trials)
+{
+	double logP = log(p);
+	double logNotP = log(1.0-p);
+	double result = 0;
+	for (size_t k = successes; k <= trials; k++)
+	{
+		double logValueHere = logNChooseK(trials, k) + k * logP + (trials-k) * logNotP;
+		result += exp(logValueHere);
+	}
+	return result;
+}
+
+double getBinomialPValueLessThan(const double p, const size_t successes, const size_t trials)
+{
+	double logP = log(p);
+	double logNotP = log(1.0-p);
+	double result = 0;
+	for (size_t k = 0; k <= successes; k++)
+	{
+		double logValueHere = logNChooseK(trials, k) + k * logP + (trials-k) * logNotP;
+		result += exp(logValueHere);
+	}
+	return result;
 }

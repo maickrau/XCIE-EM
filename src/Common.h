@@ -14,5 +14,7 @@ std::vector<std::string> getVariantOrder(const std::unordered_map<std::string, s
 std::vector<std::string> getCellOrder(const std::unordered_map<std::string, size_t>& nameToIndex);
 size_t parseVariantPosition(const std::string& name);
 std::tuple<std::string, size_t, size_t> parseBedRegion(const std::string& region);
+double getBinomialPValueGreaterThan(const double p, const size_t successes, const size_t trials);
+double getBinomialPValueLessThan(const double p, const size_t successes, const size_t trials);
 
 #endif
