@@ -100,8 +100,6 @@ int main(int argc, char** argv)
 	}
 	size_t randomSeed = params["EM-random-seed"].as<size_t>();
 	size_t numTries = params["EM-num-runs"].as<size_t>();
-//	std::string annotationFile { argv[5] };
-//	std::string secondStepGeneList { argv[6] };
 	double initialNoiseMagnitude = params["EM-noise-magnitude"].as<double>();
 	double noiseDecay = params["EM-noise-decay"].as<double>();
 	std::vector<CellMatch> cellMatches;
