@@ -117,15 +117,17 @@ std::vector<PseudobulkInfo> getVariantPseudobulk(const EMOutput& output, const s
 	return result;
 }
 
-std::string parseTag(const std::string& tags, const std::string& tagname)
+std::unordered_map<std::string, std::string> parseTags(const std::string& tagstr)
 {
-	std::regex regex { "[;^]" + tagname + "=([^;]+)[;$]" };
-	std::smatch matches;
-	if (std::regex_match(tags, matches, regex))
+	auto parts = split(tagstr, ';');
+	std::unordered_map<std::string, std::string> result;
+	for (const std::string& tag : parts)
 	{
-		return matches[1];
+		auto parts2 = split(tag, '=');
+		if (parts2.size() != 2) continue;
+		result[parts2[0]] = parts2[1];
 	}
-	return "";
+	return result;
 }
 
 std::vector<std::tuple<size_t, size_t, std::string, std::string>> getGeneInfo(const std::string gff3Path, const bool onlyProteinCoding)
@@ -144,10 +146,13 @@ std::vector<std::tuple<size_t, size_t, std::string, std::string>> getGeneInfo(co
 		if (chromosome != "23" && lowercase(chromosome) != "x" && lowercase(chromosome) != "chrx") continue;
 		std::string type = parts[2];
 		if (type != "gene") continue;
-		std::string geneType = parseTag(parts[8], "gene_type");
-		if (onlyProteinCoding && geneType != "protein_coding") continue;
-		std::string geneId = parseTag(parts[8], "gene_id");
-		std::string geneName = parseTag(parts[8], "gene_name");
+		auto tags = parseTags(parts[8]);
+		if (onlyProteinCoding)
+		{
+			if (tags.count("gene_type") == 0 || tags.at("gene_type") != "protein_coding") continue;
+		}
+		std::string geneId = tags.count("gene_id") == 1 ? tags.at("gene_id") : "";
+		std::string geneName = tags.count("gene_id") == 1 ? tags.at("gene_name") : "";
 		size_t startPos = std::stoull(parts[3]);
 		size_t endPos = std::stoull(parts[4]);
 		if (geneName == "") geneName = geneId;
@@ -159,7 +164,6 @@ std::vector<std::tuple<size_t, size_t, std::string, std::string>> getGeneInfo(co
 
 std::vector<PseudobulkInfo> getGenePseudobulk(const std::vector<PseudobulkInfo>& variantPseudobulk, const std::vector<std::tuple<size_t, size_t, std::string, std::string>>& geneInfo)
 {
-	Logger::Log.log(Logger::LogLevel::DebugInfo) << geneInfo.size() << " genes included" << std::endl;
 	if (geneInfo.size() == 0) return std::vector<PseudobulkInfo> {};
 	std::map<std::vector<std::string>, std::tuple<size_t, size_t, size_t, size_t>> counts;
 	for (const auto& t : variantPseudobulk)
@@ -184,6 +188,7 @@ std::vector<PseudobulkInfo> getGenePseudobulk(const std::vector<PseudobulkInfo>&
 	for (const auto& pair : counts)
 	{
 		assert(pair.first.size() != 0);
+		if (std::get<0>(pair.second) == 0 && std::get<1>(pair.second) == 0 && std::get<2>(pair.second) == 0 && std::get<3>(pair.second) == 0) continue;
 		result.emplace_back();
 		for (const std::string& gene : pair.first)
 		{

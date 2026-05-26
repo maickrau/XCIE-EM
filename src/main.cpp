@@ -186,6 +186,7 @@ int main(int argc, char** argv)
 	if (annotationGff3 != "")
 	{
 		auto annotation = getGeneInfo(annotationGff3, true);
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << annotation.size() << " genes included" << std::endl;
 		auto genePseudobulk2 = getGenePseudobulk(pseudobulkVariants2, annotation);
 		writePseudobulkResults(genePseudobulk2, phasesAreMatPat, outputPrefix + ".pseudobulk.genes.confidence2.tsv");
 		auto genePseudobulk0 = getGenePseudobulk(pseudobulkVariants0, annotation);
