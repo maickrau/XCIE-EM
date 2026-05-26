@@ -13,10 +13,10 @@ make all
 
 ## Running
 
-First run [scReadCounts](https://horvathlab.github.io/NGS/SCReadCounts/) to count the ref/alt coverage per variant per cell. Then run:
+First run [scReadCounts](https://horvathlab.github.io/NGS/SCReadCounts/) to count the ref/alt coverage per heterozygous variant per cell. Then run:
 
 ```
-XCIE-EM --input-screadcounts screadcounts.output.tsv --output-prefix EM_output --exclude-PAR --exclude-XIST-grch38
+XCIE-EM --input-screadcounts screadcounts.output.tsv --output-prefix EM_output --exclude-PAR --exclude-XIST-grch38 --annotation-gff3 gene_annotation_file.gff3
 ```
 
 This will estimate the variant phases and active chrX per cell. The output is written to files which start with `EM_output`. See the section [output](#output) for explanations of all the output files.
@@ -33,18 +33,30 @@ X:12356:T:C	pat
 X:12456:T:G	pat
 ```
 
-Variant name should be in format `X:(position):(ref_allele):(alt_allele)` and phase should be one of `mat` or `pat`.
+Variant name should be in format `X:(position):(ref_allele):(alt_allele)` and phase should be one of `mat` or `pat`, which means that the reference allele comes from maternal or paternal chromosome respectively. Alternately if the variants are phased without knowing their parent of origin, phase can be given as `hap1` or `hap2`, meaning the reference allele is in first or second haplotype respectively. The two formats should not be mixed so all phases should be either `mat`/`pat` or `hap1`/`hap2`. Variants outside of chrX and variants which don't match any variants in the input are allowed and silently ignored.
 
 ## Output
 
-- `output.variants.tsv`: Description of variant phases, and phasing confidence.
-- `output.cells.tsv`: Description of cell activity (which chrX is active per cell), and activity confidence. The cell activity confidence is estimated only from variants which are estimated to be non-escape.
+- `output.variants.tsv`: Description of variant phases, and phasing confidence. The phase columns refers to the phase of the reference allele, so eg. phase `mat` means the reference allele comes from the maternal chromosome.
+- `output.cells.tsv`: Description of cell activity (which chrX is active per cell), and activity confidence. The cell activity confidence is estimated only from variants which are estimated to be non-escape. The active column refers to the active chrX, so eg. active `mat` means that the maternally inherited chrX is active and paternally inherited chrX is inactive.
 - `output.cells.withescapevariants.tsv`: Description of cell activity (which chrX is active per cell), and activity confidence. The cell activity confidence is estimated from all variants, which biases the cell activity confidence estimate downwards for cells which have high expression in escape variants. Not recommended to be used unless you know what you are doing.
-- `output.pseudobulk.variants.confidence2.tsv`: The pseudobulk expression of each variant. The expression is split by chromosome, and further by whether the chromosome is the active chrX or inactive chrX. Only variants and cells which are confidently phased are included.
-- `output.pseudobulk.variants.confidence0.tsv`: The pseudobulk expression of each variant. The expression is split by chromosome, and further by whether the chromosome is the active chrX or inactive chrX. All variants and cells are included, even those whose phasing is uncertain.
-- `output.pseudobulk.genes.confidence2.tsv`: The pseudobulk expression of protein coding chrX genes. The expression is split by chromosome, and further by whether the chromosome is the active chrX or inactive chrX. This sums over the variants in  `output.pseudobulk.variants.confidence2.tsv`. Only output if the parameter `--annotation-gff3` is given.
-- `output.pseudobulk.genes.confidence0.tsv`: The pseudobulk expression of protein coding chrX genes. The expression is split by chromosome, and further by whether the chromosome is the active chrX or inactive chrX. This sums over the variants in  `output.pseudobulk.variants.confidence0.tsv`. Only output if the parameter `--annotation-gff3` is given.
+- `output.pseudobulk.variants.confidence2.tsv`: The pseudobulk expression of each variant. The expression is split by haplotype and by whether the haplotype is the active chrX or inactive chrX. Only variants and cells which are confidently phased are included.
+- `output.pseudobulk.variants.confidence0.tsv`: The pseudobulk expression of each variant. The expression is split by haplotype and by whether the haplotype is the active chrX or inactive chrX. All variants and cells are included, even those whose phasing is uncertain.
+- `output.pseudobulk.genes.confidence2.tsv`: The pseudobulk expression of protein coding chrX genes. The expression is split by haplotype and by whether the haplotype is the active chrX or inactive chrX. This sums over the variants in `output.pseudobulk.variants.confidence2.tsv`. Requires the parameter `--annotation-gff3`.
+- `output.pseudobulk.genes.confidence0.tsv`: The pseudobulk expression of protein coding chrX genes. The expression is split by haplotype and by whether the haplotype is the active chrX or inactive chrX. This sums over the variants in `output.pseudobulk.variants.confidence0.tsv`. Requires the parameter `--annotation-gff3`.
 - `output.preprocessed_matches.tsv`: A file with the cell vs variant matches preprocessed into a suitable format.
+
+### Phase confidence and active chrX confidence
+
+The phase confidence in the output files means how confident the probabilistic model is that the given phase is correct. It refers to the difference in log-likelihood between the current phase and the other phase, that is, `confidence = ln [ P(observed data | current variant phase) / P(observed data | flipped variant phase) ]`. The active chrX confidence of cells is calculated similarly from the log-likelihood difference.
+
+### Haplotype names
+
+If parent of origin is given from trio data then the variants and cells are phased using the terms `mat` and `pat`, where variant phase `mat` means the reference allele is maternal and cell active `mat` means the maternal chrX is active. If no parent of origin is available then the haplotypes are called `hap1` and `hap2`, where again variant phase `hap1` means that the reference allele comes from the first haplotype and cell active `hap1` means that the chrX represented by the first haplotype is is active. That is, the terms `hap1` and `hap2` are consistent between the variant phase and cell active chrX.
+
+### Pseudobulk p-values
+
+The pseudobulk variant and gene files have columns `pvalue_Xiover10` and `pvalue_Xiunder10`. These are the p-values of binomial test for checking if the fraction of inactive expression is above / below 10%. The column `Xi` also shows the fraction of inactive expression.
 
 ## Parameters
 
@@ -60,4 +72,3 @@ Variant name should be in format `X:(position):(ref_allele):(alt_allele)` and ph
 - `--exclude-regions`: Exclude some regions. The reason to exclude regions is that some regions (eg XIST) have higher expression from the inactive chrX, which violates the fundamental assumptions used in the EM algorithm.
 - `--exclude-PAR`: Exclude the PAR region. Recommended since the PAR region usually has low phasing accuracy.
 - `--exclude-XIST-grch38 --exclude-XIST-grch37 --exclude-XIST-chm13`: Exclude the XIST and TSIX genes. Recommended since XIST has higher expression from the inactive chrX. You should pick the correct one based on your reference.
-
