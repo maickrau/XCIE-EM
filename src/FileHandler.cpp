@@ -159,10 +159,12 @@ void writePseudobulkVariantResults(const std::vector<PseudobulkVariantInfo>& var
 	}
 }
 
-std::unordered_map<std::string, bool> readForcedVariantPhases(const std::string& filename)
+std::pair<std::unordered_map<std::string, bool>, bool> readForcedVariantPhases(const std::string& filename)
 {
 	std::unordered_map<std::string, bool> forcedVariants;
-	if (filename == "") return forcedVariants;
+	bool forcedPhasesAreMatPat = false;
+	bool foundAny = false;
+	if (filename == "") return std::make_pair(forcedVariants, forcedPhasesAreMatPat);
 	std::ifstream file { filename };
 	size_t totalForcedVariants = 0;
 	while (file.good())
@@ -175,18 +177,42 @@ std::unordered_map<std::string, bool> readForcedVariantPhases(const std::string&
 		std::string origin;
 		sstr >> variant >> origin;
 		totalForcedVariants += 1;
-		if (origin == "mat")
+		if (origin == "hap1" || origin == "mat")
 		{
 			forcedVariants[variant] = true;
 		}
-		else
+		if (origin == "hap2" || origin == "pat")
 		{
-			assert(origin == "pat");
 			forcedVariants[variant] = false;
+		}
+		if (origin == "hap1" || origin == "hap2")
+		{
+			if (foundAny && forcedPhasesAreMatPat)
+			{
+				std::cerr << "Forced phase file has invalid format: mixing hap1/hap2 and mat/pat. Phases should be either hap1/hap2 or mat/pat but not both." << std::endl;
+				std::abort();
+			}
+			foundAny = true;
+			forcedPhasesAreMatPat = false;
+		}
+		if (origin == "mat" || origin == "pat")
+		{
+			if (foundAny && !forcedPhasesAreMatPat)
+			{
+				std::cerr << "Forced phase file has invalid format: mixing hap1/hap2 and mat/pat. Phases should be either hap1/hap2 or mat/pat but not both." << std::endl;
+				std::abort();
+			}
+			foundAny = true;
+			forcedPhasesAreMatPat = true;
+		}
+		if (origin != "hap1" && origin != "hap2" && origin != "mat" && origin != "pat")
+		{
+			std::cerr << "Invalid phase in forced phase file: \"" << origin << "\"" << std::endl;
+			std::abort();
 		}
 	}
 	Logger::Log.log(Logger::LogLevel::DebugInfo) << "total forced variants " << totalForcedVariants << std::endl;
-	return forcedVariants;
+	return std::make_pair(forcedVariants, forcedPhasesAreMatPat);
 }
 
 void writeCellMatchCounts(const std::vector<CellMatch>& cellMatches, const std::string& filename)

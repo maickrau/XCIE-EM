@@ -155,8 +155,10 @@ int main(int argc, char** argv)
 	}
 	writeCellMatchCounts(cellMatches, outputPrefix + ".preprocessed_matches.tsv");
 	Logger::Log.log(Logger::LogLevel::DebugInfo) << "read forced variant phases" << std::endl;
-	auto forcedPhases = readForcedVariantPhases(forcedPhaseFile);
-	bool phasesAreMatPat = (forcedPhases.size() > 0);
+	std::unordered_map<std::string, bool> forcedPhases;
+	bool forcedPhasesAreMatPat;
+	std::tie(forcedPhases, forcedPhasesAreMatPat) = readForcedVariantPhases(forcedPhaseFile);
+	bool phasesAreMatPat = (forcedPhases.size() > 0) && forcedPhasesAreMatPat;
 	EMOutput output = runEM(cellMatches, forcedPhases, randomSeed, initialNoiseMagnitude, noiseDecay, numTries);
 	{
 		std::ofstream variantResult { outputPrefix + ".variants.tsv" };
