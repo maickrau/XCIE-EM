@@ -4,14 +4,14 @@
 #include <string>
 #include <unordered_map>
 #include <algorithm>
-#include "Common.h"
 #include <api/BamReader.h>
+#include <zstr.hpp> //https://github.com/mateidavid/zstr
+#include "Common.h"
 #include "SNPCounter.h"
 #include "Logger.h"
 
-std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> readVariants(const std::string& vcfFile)
+std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> readVariants(std::istream& file)
 {
-	std::ifstream file { vcfFile };
 	size_t chromColumnIndex = 0;
 	size_t posColumnIndex = 1;
 	size_t refColumnIndex = 3;
@@ -53,6 +53,18 @@ std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> rea
 		result[chromosome].emplace_back(pos, ref[0], alt[0]);
 	}
 	return result;
+}
+
+std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> readVariantsVcf(const std::string& vcfFile)
+{
+	std::ifstream file { vcfFile };
+	return readVariants(file);
+}
+
+std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> readVariantsVcfGz(const std::string& vcfGzFile)
+{
+	zstr::ifstream file { vcfGzFile };
+	return readVariants(file);
 }
 
 std::string readBarcode(const BamTools::BamAlignment& aln)
@@ -186,7 +198,20 @@ std::vector<CellMatch> countSNPsFromBam(const std::string& bamFile, const std::u
 std::vector<CellMatch> countSNPsFromBamVcf(const std::string& vcfFile, const std::string& bamFile)
 {
 	Logger::Log.log(Logger::LogLevel::DebugInfo) << "read variants from " << vcfFile << std::endl;
-	auto variants = readVariants(vcfFile);
+	std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> variants;
+	if (vcfFile.size() >= 4 && vcfFile.substr(vcfFile.size() - 4) == ".vcf")
+	{
+		variants = readVariantsVcf(vcfFile);
+	}
+	else if (vcfFile.size() >= 7 && vcfFile.substr(vcfFile.size() - 7) == ".vcf.gz")
+	{
+		variants = readVariantsVcfGz(vcfFile);
+	}
+	else
+	{
+		std::cerr << "Unknown file extension for vcf file. Valid extensions are .vcf and .vcf.gz" << std::endl;
+		std::abort();
+	}
 	Logger::Log.log(Logger::LogLevel::DebugInfo) << "variants in " << variants.size() << " chromosomes" << std::endl;
 	Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << "sort variants" << std::endl;
 	size_t totalVariants = 0;
