@@ -98,7 +98,7 @@ void writeResultCellOnlyNonescapeVariants(const EMOutput& result, const bool pha
 	const std::string matName = matHapName(phasesAreMatPat);
 	const std::string patName = patHapName(phasesAreMatPat);
 	std::vector<std::string> cellOrder = getCellOrder(result.helpers.cellNameToIndex);
-	stream << "cell\tcoverage\tactive_chrX\tactive_chrX_confidence\tescape_estimate\tescape_ci_low\tescape_ci_high" << std::endl;
+	stream << "cell\tcoverage\tactive_chrX\tactive_chrX_confidence\tescape_estimate\tescape_ci_low\tescape_ci_high" << "\n";
 	for (const std::string& cell : cellOrder)
 	{
 		const size_t cellIndex = result.helpers.cellNameToIndex.at(cell);
@@ -107,7 +107,7 @@ void writeResultCellOnlyNonescapeVariants(const EMOutput& result, const bool pha
 		const double scoreDifference = result.additions.cellActiveConfidenceOnlyNonescape[cellIndex];
 		const double escapeConfidenceIntervalMin = result.additions.cellEscapeCILow[cellIndex];
 		const double escapeConfidenceIntervalMax = result.additions.cellEscapeCIHigh[cellIndex];
-		stream << cell << "\t" << result.helpers.cellCoverage[cellIndex] << "\t" << (matActive ? matName : patName) << "\t" << scoreDifference << "\t" << escape << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << std::endl;
+		stream << cell << "\t" << result.helpers.cellCoverage[cellIndex] << "\t" << (matActive ? matName : patName) << "\t" << scoreDifference << "\t" << escape << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << "\n";
 	}
 }
 
@@ -116,7 +116,7 @@ void writeResultCells(const EMOutput& result, const bool phasesAreMatPat, std::o
 	const std::string matName = matHapName(phasesAreMatPat);
 	const std::string patName = patHapName(phasesAreMatPat);
 	std::vector<std::string> cellOrder = getCellOrder(result.helpers.cellNameToIndex);
-	stream << "cell\tcoverage\tactive_chrX\tactive_chrX_confidence\tescape_estimate\tescape_ci_low\tescape_ci_high" << std::endl;
+	stream << "cell\tcoverage\tactive_chrX\tactive_chrX_confidence\tescape_estimate\tescape_ci_low\tescape_ci_high" << "\n";
 	for (const std::string& cell : cellOrder)
 	{
 		const size_t cellIndex = result.helpers.cellNameToIndex.at(cell);
@@ -125,7 +125,7 @@ void writeResultCells(const EMOutput& result, const bool phasesAreMatPat, std::o
 		const double scoreDifference = result.additions.cellActiveConfidence[cellIndex];
 		const double escapeConfidenceIntervalMin = result.additions.cellEscapeCILow[cellIndex];
 		const double escapeConfidenceIntervalMax = result.additions.cellEscapeCIHigh[cellIndex];
-		stream << cell << "\t" << result.helpers.cellCoverage[cellIndex] << "\t" << (matActive ? matName : patName) << "\t" << scoreDifference << "\t" << escape << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << std::endl;
+		stream << cell << "\t" << result.helpers.cellCoverage[cellIndex] << "\t" << (matActive ? matName : patName) << "\t" << scoreDifference << "\t" << escape << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << "\n";
 	}
 }
 
@@ -134,7 +134,7 @@ void writeResultVariants(const EMOutput& result, const bool phasesAreMatPat, std
 	const std::string matName = matHapName(phasesAreMatPat);
 	const std::string patName = patHapName(phasesAreMatPat);
 	std::vector<std::string> variantOrder = getVariantOrder(result.helpers.variantNameToIndex);
-	stream << "variant\tcoverage\tphase\tphase_confidence\tescape_estimate\tescape_ci_low\tescape_ci_high" << std::endl;
+	stream << "variant\tcoverage\tphase\tphase_confidence\tescape_estimate\tescape_ci_low\tescape_ci_high" << "\n";
 	for (const std::string& variant : variantOrder)
 	{
 		const size_t variantIndex = result.helpers.variantNameToIndex.at(variant);
@@ -143,7 +143,7 @@ void writeResultVariants(const EMOutput& result, const bool phasesAreMatPat, std
 		const double phaseScoreDifference = result.additions.variantPhaseConfidence[variantIndex];
 		const double escapeConfidenceIntervalMin = result.additions.variantEscapeCILow[variantIndex];
 		const double escapeConfidenceIntervalMax = result.additions.variantEscapeCIHigh[variantIndex];
-		stream << variant << "\t" << result.helpers.variantCoverage[variantIndex] << "\t" <<  (matRef ? matName : patName) << "\t" << phaseScoreDifference << "\t" << escape << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << std::endl;
+		stream << variant << "\t" << result.helpers.variantCoverage[variantIndex] << "\t" <<  (matRef ? matName : patName) << "\t" << phaseScoreDifference << "\t" << escape << "\t" << escapeConfidenceIntervalMin << "\t" << escapeConfidenceIntervalMax << "\n";
 	}
 }
 
@@ -152,13 +152,13 @@ void writePseudobulkResults(const std::vector<PseudobulkInfo>& pseudobulk, const
 	const std::string matName = matHapName(phasesAreMatPat);
 	const std::string patName = patHapName(phasesAreMatPat);
 	std::ofstream file { filename };
-	file << "variant\t" << matName << "_active_expression" << "\t" << matName << "_inactive_expression" << "\t" << patName << "_active_expression" << "\t" << patName << "_inactive_expression" << "\t" << "Xi" << "\t" << "pvalue_Xiover10" << "\t" << "pvalue_Xiunder10" << std::endl;
+	file << "variant\t" << matName << "_active_expression" << "\t" << matName << "_inactive_expression" << "\t" << patName << "_active_expression" << "\t" << patName << "_inactive_expression" << "\t" << "Xi" << "\t" << "pvalue_Xiover10" << "\t" << "pvalue_Xiunder10" << "\n";
 	for (const auto& t : pseudobulk)
 	{
 		double pValueOver = getBinomialPValueGreaterThan(0.1, t.matXi+t.patXi, t.matXa+t.matXi+t.patXa+t.patXi);
 		double pValueUnder = getBinomialPValueLessThan(0.1, t.matXi+t.patXi, t.matXa+t.matXi+t.patXa+t.patXi);
 		double Xi = (double)(t.matXi+t.patXi) / (double)(t.matXi+t.matXa+t.patXi+t.patXa);
-		file << t.name << "\t" << t.matXa << "\t" << t.matXi << "\t" << t.patXa << "\t" << t.patXi << "\t" << Xi << "\t" << pValueOver << "\t" << pValueUnder << std::endl;
+		file << t.name << "\t" << t.matXa << "\t" << t.matXi << "\t" << t.patXa << "\t" << t.patXi << "\t" << Xi << "\t" << pValueOver << "\t" << pValueUnder << "\n";
 	}
 }
 
@@ -192,7 +192,7 @@ std::pair<std::unordered_map<std::string, bool>, bool> readForcedVariantPhases(c
 		{
 			if (foundAny && forcedPhasesAreMatPat)
 			{
-				std::cerr << "Forced phase file has invalid format: mixing hap1/hap2 and mat/pat. Phases should be either hap1/hap2 or mat/pat but not both." << std::endl;
+				std::cerr << "Forced phase file has invalid format: mixing hap1/hap2 and mat/pat. Phases should be either hap1/hap2 or mat/pat but not both." << "\n";
 				std::abort();
 			}
 			foundAny = true;
@@ -202,7 +202,7 @@ std::pair<std::unordered_map<std::string, bool>, bool> readForcedVariantPhases(c
 		{
 			if (foundAny && !forcedPhasesAreMatPat)
 			{
-				std::cerr << "Forced phase file has invalid format: mixing hap1/hap2 and mat/pat. Phases should be either hap1/hap2 or mat/pat but not both." << std::endl;
+				std::cerr << "Forced phase file has invalid format: mixing hap1/hap2 and mat/pat. Phases should be either hap1/hap2 or mat/pat but not both." << "\n";
 				std::abort();
 			}
 			foundAny = true;
@@ -210,11 +210,11 @@ std::pair<std::unordered_map<std::string, bool>, bool> readForcedVariantPhases(c
 		}
 		if (origin != "hap1" && origin != "hap2" && origin != "mat" && origin != "pat")
 		{
-			std::cerr << "Invalid phase in forced phase file: \"" << origin << "\"" << std::endl;
+			std::cerr << "Invalid phase in forced phase file: \"" << origin << "\"" << "\n";
 			std::abort();
 		}
 	}
-	Logger::Log.log(Logger::LogLevel::DebugInfo) << "total forced variants " << totalForcedVariants << std::endl;
+	Logger::Log.log(Logger::LogLevel::DebugInfo) << "total forced variants " << totalForcedVariants << "\n";
 	return std::make_pair(forcedVariants, forcedPhasesAreMatPat);
 }
 
@@ -223,6 +223,6 @@ void writeCellMatchCounts(const std::vector<CellMatch>& cellMatches, const std::
 	std::ofstream file { filename };
 	for (const auto& match : cellMatches)
 	{
-		file << match.cell << "\t" << match.variant << "\t" << (match.alt ? "ALT" : "REF") << "\t" << match.count << std::endl;
+		file << match.cell << "\t" << match.variant << "\t" << (match.alt ? "ALT" : "REF") << "\t" << match.count << "\n";
 	}
 }

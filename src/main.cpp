@@ -166,9 +166,11 @@ int main(int argc, char** argv)
 	bool phasesAreMatPat = (forcedPhases.size() > 0) && forcedPhasesAreMatPat;
 	EMOutput output = runEM(cellMatches, forcedPhases, randomSeed, initialNoiseMagnitude, noiseDecay, numTries);
 	{
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "write variant results" << std::endl;
 		std::ofstream variantResult { outputPrefix + ".variants.tsv" };
 		writeResultVariants(output, phasesAreMatPat, variantResult);
 	}
+	Logger::Log.log(Logger::LogLevel::DebugInfo) << "write cell results" << std::endl;
 	{
 		std::ofstream cellResultWithEscapeVariants { outputPrefix + ".cells.withescapevariants.tsv" };
 		writeResultCells(output, phasesAreMatPat, cellResultWithEscapeVariants);
@@ -177,14 +179,17 @@ int main(int argc, char** argv)
 		std::ofstream cellResult { outputPrefix + ".cells.tsv" };
 		writeResultCellOnlyNonescapeVariants(output, phasesAreMatPat, cellResult);
 	}
+	Logger::Log.log(Logger::LogLevel::DebugInfo) << "write variant pseudobulk results" << std::endl;
 	auto pseudobulkVariants2 = getVariantPseudobulk(output, cellMatches, 2);
 	writePseudobulkResults(pseudobulkVariants2, phasesAreMatPat, outputPrefix + ".pseudobulk.variants.confidence2.tsv");
 	auto pseudobulkVariants0 = getVariantPseudobulk(output, cellMatches, 0);
 	writePseudobulkResults(pseudobulkVariants0, phasesAreMatPat, outputPrefix + ".pseudobulk.variants.confidence0.tsv");
 	if (annotationGff3 != "")
 	{
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "read gene annotation" << std::endl;
 		auto annotation = getGeneInfo(annotationGff3, true);
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << annotation.size() << " genes included" << std::endl;
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "write gene pseudobulk results" << std::endl;
 		auto genePseudobulk2 = getGenePseudobulk(pseudobulkVariants2, annotation);
 		writePseudobulkResults(genePseudobulk2, phasesAreMatPat, outputPrefix + ".pseudobulk.genes.confidence2.tsv");
 		auto genePseudobulk0 = getGenePseudobulk(pseudobulkVariants0, annotation);
