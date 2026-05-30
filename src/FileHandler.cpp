@@ -158,6 +158,7 @@ void writePseudobulkResults(const std::vector<PseudobulkInfo>& pseudobulk, const
 		double pValueOver = getBinomialPValueGreaterThan(0.1, t.matXi+t.patXi, t.matXa+t.matXi+t.patXa+t.patXi);
 		double pValueUnder = getBinomialPValueLessThan(0.1, t.matXi+t.patXi, t.matXa+t.matXi+t.patXa+t.patXi);
 		double Xi = (double)(t.matXi+t.patXi) / (double)(t.matXi+t.matXa+t.patXi+t.patXa);
+		if (t.matXi == 0 && t.matXa == 0 && t.patXi == 0 && t.patXa == 0) Xi = 0;
 		file << t.name << "\t" << t.matXa << "\t" << t.matXi << "\t" << t.patXa << "\t" << t.patXi << "\t" << Xi << "\t" << pValueOver << "\t" << pValueUnder << "\n";
 	}
 }
