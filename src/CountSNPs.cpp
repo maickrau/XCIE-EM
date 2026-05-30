@@ -12,7 +12,7 @@ int main(int argc, char** argv)
 	std::cout << "CHROM\tPOS\tREF\tALT\tReadGroup\tSNVCountForward\tSNVCountReverse\tRefCountForward\tRefCountReverse\tSNVCount\tRefCount" << std::endl;
 	for (const auto& match : matches)
 	{
-		std::cout << match.chromosome << "\t" << match.position << "\t" << match.ref << "\t" << match.alt << "\t" << match.barcode << "\t" << match.altFwCount << "\t" << match.altBwCount << "\t" << match.refFwCount << "\t" << match.refBwCount << "\t" << (match.altFwCount + match.altBwCount) << "\t" << (match.refFwCount + match.refBwCount) << std::endl;
+		printf("%s\t%lu\t%c\t%c\t%s\t%lu\t%lu\t%lu\t%lu\t%lu\t%lu\n", match.chromosome.c_str(), match.position, match.ref, match.alt, match.barcode.c_str(), match.altFwCount, match.altBwCount, match.refFwCount, match.refBwCount, match.altFwCount+match.altBwCount, match.refFwCount+match.refBwCount);
 	}
 	Logger::Log.log(Logger::LogLevel::DebugInfo) << "done" << std::endl;
 }
