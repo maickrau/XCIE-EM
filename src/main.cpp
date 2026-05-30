@@ -149,7 +149,8 @@ int main(int argc, char** argv)
 		std::string inputBamFile = params["input-bam"].as<std::string>();
 		std::string inputVcfFile = params["input-vcf"].as<std::string>();
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "parse variant matches from bam " << inputBamFile << " and vcf " << inputVcfFile << std::endl;
-		cellMatches = countSNPsFromBamVcf(inputVcfFile, inputBamFile);
+		auto snpMatches = countSNPsFromBamVcf(inputVcfFile, inputBamFile);
+		cellMatches = convertSNPMatchesToCellMatches(snpMatches);
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << cellMatches.size() << " count items" << std::endl;
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "filter out homozygous sites" << std::endl;
 		cellMatches = filterOutHomozygousSites(cellMatches);

@@ -74,7 +74,7 @@ std::string readBarcode(const BamTools::BamAlignment& aln)
 	return result;
 }
 
-std::vector<CellMatch> countSNPsFromBam(const std::string& bamFile, const std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>>& refvariants)
+std::vector<SNPMatch> countSNPsFromBam(const std::string& bamFile, const std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>>& refvariants)
 {
 	BamTools::BamReader reader;
 	if (!reader.Open(bamFile))
@@ -90,7 +90,7 @@ std::vector<CellMatch> countSNPsFromBam(const std::string& bamFile, const std::u
 	size_t currentChromosomeSNPIndex = 0;
 	size_t refId = std::numeric_limits<size_t>::max();
 	std::string currentChromosome = "";
-	std::unordered_map<std::string, std::unordered_map<std::string, std::pair<size_t, size_t>>> matches;
+	std::unordered_map<std::string, std::unordered_map<size_t, std::unordered_map<std::string, std::tuple<size_t, size_t, size_t, size_t>>>> matches;
 	size_t bamAlns = 0;
 	size_t reads = 0;
 	size_t readsWithTag = 0;
@@ -108,6 +108,7 @@ std::vector<CellMatch> countSNPsFromBam(const std::string& bamFile, const std::u
 		{
 			refId = aln.RefID;
 			currentChromosome = references[refId].RefName;
+			Logger::Log.log(Logger::LogLevel::DebugInfo) << "begin chromosome " << currentChromosome << std::endl;
 			currentChromosomeSNPIndex = 0;
 			lastReadStartPosition = 0;
 		}
@@ -146,19 +147,33 @@ std::vector<CellMatch> countSNPsFromBam(const std::string& bamFile, const std::u
 			while (j < variants.size() && refpos > std::get<0>(variants[j])) j += 1;
 			while (j < variants.size() && refpos+cigar.Length > std::get<0>(variants[j]))
 			{
-				std::string variantName = currentChromosome.substr(3) + ":" + std::to_string(std::get<0>(variants[j])+1) + ":" + std::get<1>(variants[j]) + ":" + std::get<2>(variants[j]);
+				std::string chromosome = currentChromosome;
 				size_t variantPositionInRead = readpos+(std::get<0>(variants[j])-refpos);
 				assert(variantPositionInRead < aln.QueryBases.size());
 				char readNucleotide = aln.QueryBases[variantPositionInRead];
 				if (readNucleotide == std::get<1>(variants[j]))
 				{
 					matchCount += 1;
-					matches[variantName][barcode].first += 1;
+					if (aln.IsReverseStrand())
+					{
+						std::get<1>(matches[chromosome][j][barcode]) += 1;
+					}
+					else
+					{
+						std::get<0>(matches[chromosome][j][barcode]) += 1;
+					}
 				}
 				if (readNucleotide == std::get<2>(variants[j]))
 				{
 					matchCount += 1;
-					matches[variantName][barcode].second += 1;
+					if (aln.IsReverseStrand())
+					{
+						std::get<3>(matches[chromosome][j][barcode]) += 1;
+					}
+					else
+					{
+						std::get<2>(matches[chromosome][j][barcode]) += 1;
+					}
 				}
 				j += 1;
 			}
@@ -169,33 +184,42 @@ std::vector<CellMatch> countSNPsFromBam(const std::string& bamFile, const std::u
 	Logger::Log.log(Logger::LogLevel::DebugInfo) << reads << " reads" << std::endl;
 	Logger::Log.log(Logger::LogLevel::DebugInfo) << readsWithTag << " reads with barcode" << std::endl;
 	Logger::Log.log(Logger::LogLevel::DebugInfo) << matchCount << " read-variant matches" << std::endl;
-	std::vector<CellMatch> parsed;
+	std::vector<SNPMatch> parsed;
 	for (const auto& variantpair : matches)
 	{
-		for (const auto& cellpair : variantpair.second)
+		for (const auto& pospair : variantpair.second)
 		{
-			if (cellpair.second.first > 0)
+			for (const auto& cellpair : pospair.second)
 			{
 				parsed.emplace_back();
-				parsed.back().cell = cellpair.first;
-				parsed.back().variant = variantpair.first;
-				parsed.back().alt = false;
-				parsed.back().count = cellpair.second.first;
-			}
-			if (cellpair.second.second > 0)
-			{
-				parsed.emplace_back();
-				parsed.back().cell = cellpair.first;
-				parsed.back().variant = variantpair.first;
-				parsed.back().alt = true;
-				parsed.back().count = cellpair.second.second;
+				parsed.back().chromosome = variantpair.first.substr(3);
+				parsed.back().position = std::get<0>(refvariants.at(variantpair.first)[pospair.first])+1;
+				parsed.back().ref = std::get<1>(refvariants.at(variantpair.first)[pospair.first]);
+				parsed.back().alt = std::get<2>(refvariants.at(variantpair.first)[pospair.first]);
+				parsed.back().barcode = cellpair.first;
+				parsed.back().refFwCount = std::get<0>(cellpair.second);
+				parsed.back().refBwCount = std::get<1>(cellpair.second);
+				parsed.back().altFwCount = std::get<2>(cellpair.second);
+				parsed.back().altBwCount = std::get<3>(cellpair.second);
 			}
 		}
 	}
+	std::sort(parsed.begin(), parsed.end(), [](const auto& left, const auto& right)
+	{
+		if (left.chromosome < right.chromosome) return true;
+		if (left.chromosome > right.chromosome) return false;
+		if (left.position < right.position) return true;
+		if (left.position > right.position) return false;
+		if (left.barcode < right.barcode) return true;
+		if (left.barcode > right.barcode) return false;
+		assert(left.ref == right.ref);
+		assert(left.alt == right.alt);
+		return false;
+	});
 	return parsed;
 }
 
-std::vector<CellMatch> countSNPsFromBamVcf(const std::string& vcfFile, const std::string& bamFile)
+std::vector<SNPMatch> countSNPsFromBamVcf(const std::string& vcfFile, const std::string& bamFile)
 {
 	Logger::Log.log(Logger::LogLevel::DebugInfo) << "read variants from " << vcfFile << std::endl;
 	std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> variants;
@@ -223,17 +247,30 @@ std::vector<CellMatch> countSNPsFromBamVcf(const std::string& vcfFile, const std
 	Logger::Log.log(Logger::LogLevel::DebugInfo) << totalVariants << " variants" << std::endl;
 	Logger::Log.log(Logger::LogLevel::DebugInfo) << "read bam from " << bamFile << std::endl;
 	auto result = countSNPsFromBam(bamFile, variants);
-	std::sort(result.begin(), result.end(), [](const auto& left, const auto& right)
-	{
-		size_t leftpos = parseVariantPosition(left.variant);
-		size_t rightpos = parseVariantPosition(right.variant);
-		if (leftpos < rightpos) return true;
-		if (rightpos < leftpos) return false;
-		if (left.cell < right.cell) return true;
-		if (right.cell < left.cell) return false;
-		if (!left.alt && right.alt) return true;
-		return false;
-	});
 	return result;
 }
 
+std::vector<CellMatch> convertSNPMatchesToCellMatches(const std::vector<SNPMatch>& snpMatches)
+{
+	std::vector<CellMatch> result;
+	for (const auto& item : snpMatches)
+	{
+		if (item.refFwCount + item.refBwCount > 0)
+		{
+			result.emplace_back();
+			result.back().variant = item.chromosome + ":" + std::to_string(item.position) + ":" + item.ref + ":" + item.alt;
+			result.back().cell = item.barcode;
+			result.back().alt = false;
+			result.back().count = item.refFwCount + item.refBwCount;
+		}
+		if (item.altFwCount + item.altBwCount > 0)
+		{
+			result.emplace_back();
+			result.back().variant = item.chromosome + ":" + std::to_string(item.position) + ":" + item.ref + ":" + item.alt;
+			result.back().cell = item.barcode;
+			result.back().alt = true;
+			result.back().count = item.altFwCount + item.altBwCount;
+		}
+	}
+	return result;
+}
