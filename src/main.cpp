@@ -6,6 +6,7 @@
 #include "EM.h"
 #include "Common.h"
 #include "AlleleSpecificExpression.h"
+#include "SNPCounter.h"
 
 int main(int argc, char** argv)
 {
@@ -15,6 +16,8 @@ int main(int argc, char** argv)
 		("v,version", "Print version")
 		("input-screadcounts", "Input scReadCounts cell/variant match table", cxxopts::value<std::string>())
 		("input-preprocessed-table", "Input prerocessed table of cell/variant matches", cxxopts::value<std::string>())
+		("input-bam", "Input aligned BAM file", cxxopts::value<std::string>())
+		("input-vcf", "Input variant VCF file", cxxopts::value<std::string>())
 		("o,output-prefix", "Output prefix", cxxopts::value<std::string>()->default_value("./result"))
 		("annotation-gff3", "Calculate gene level pseudobulk values based on gene annotations in this file", cxxopts::value<std::string>())
 		("force-phase", "File with pre-phased trio variants", cxxopts::value<std::string>())
@@ -50,12 +53,22 @@ int main(int argc, char** argv)
 		std::exit(0);
 	}
 	bool paramError = false;
-	if (params.count("input-preprocessed-table") == 0 && params.count("input-screadcounts") == 0)
+	if (params.count("input-preprocessed-table") == 0 && params.count("input-screadcounts") == 0 && params.count("input-bam") == 0 && params.count("input-vcf") == 0)
 	{
 		std::cerr << "Input is required" << std::endl;
 		paramError = true;
 	}
-	if (params.count("input-preprocessed-table") + params.count("input-screadcounts") > 1)
+	if (params.count("input-bam") == 1 && params.count("input-vcf") == 0)
+	{
+		std::cerr << "--input-bam also requires --input-vcf" << std::endl;
+		paramError = true;
+	}
+	if (params.count("input-vcf") == 1 && params.count("input-bam") == 0)
+	{
+		std::cerr << "--input-vcf also requires --input-bam" << std::endl;
+		paramError = true;
+	}
+	if (params.count("input-preprocessed-table") + params.count("input-screadcounts") + (params.count("input-bam") == 1 && params.count("input-vcf") == 1 ? 1 : 0) > 1)
 	{
 		std::cerr << "Use only one input" << std::endl;
 		paramError = true;
@@ -131,6 +144,18 @@ int main(int argc, char** argv)
 		excludedRegions.emplace_back(72225527, 72286069);
 	}
 	std::sort(excludedRegions.begin(), excludedRegions.end());
+	if (params.count("input-bam") > 0)
+	{
+		std::string inputBamFile = params["input-bam"].as<std::string>();
+		std::string inputVcfFile = params["input-vcf"].as<std::string>();
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "parse variant matches from bam " << inputBamFile << " and vcf " << inputVcfFile << std::endl;
+		auto snpMatches = countSNPsFromBamVcf(inputVcfFile, inputBamFile);
+		cellMatches = convertSNPMatchesToCellMatches(snpMatches);
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << cellMatches.size() << " count items" << std::endl;
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "filter out homozygous sites" << std::endl;
+		cellMatches = filterOutHomozygousSites(cellMatches);
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << cellMatches.size() << " count items" << std::endl;
+	}
 	if (params.count("input-preprocessed-table") > 0)
 	{
 		std::string matchTableFile = params["input-preprocessed-table"].as<std::string>();
@@ -186,7 +211,7 @@ int main(int argc, char** argv)
 	writePseudobulkResults(pseudobulkVariants0, phasesAreMatPat, outputPrefix + ".pseudobulk.variants.confidence0.tsv");
 	if (annotationGff3 != "")
 	{
-		Logger::Log.log(Logger::LogLevel::DebugInfo) << "read gene annotation" << std::endl;
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "read gene annotations" << std::endl;
 		auto annotation = getGeneInfo(annotationGff3, true);
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << annotation.size() << " genes included" << std::endl;
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "write gene pseudobulk results" << std::endl;
