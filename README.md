@@ -63,7 +63,7 @@ If parent of origin is given from trio data then the variants and cells are phas
 
 ### Pseudobulk p-values
 
-The pseudobulk variant and gene files have columns `pvalue_Xiover10` and `pvalue_Xiunder10`. These are the p-values of binomial test for checking if the fraction of inactive expression is above / below 10%. The column `Xi` also shows the fraction of inactive expression.
+The pseudobulk variant and gene files have columns `pvalue_Xiover10_unadjusted` and `pvalue_Xiunder10_unadjusted`. These are the p-values of binomial test for checking if the fraction of inactive expression is above / below 10%. The column `Xi` also shows the fraction of inactive expression. The p-values are **not adjusted for multiple testing**. You should correct the p-values for multiple testing.
 
 ## Parameters
 
