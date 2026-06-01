@@ -47,12 +47,6 @@ size_t EMHelperVariables::numCells() const
 	return cellNameToIndex.size();
 }
 
-size_t getCount(const std::vector<std::unordered_map<size_t, size_t>>& cellVariantCount, const size_t cell, const size_t variant)
-{
-	if (cellVariantCount[cell].count(variant) == 0) return 0;
-	return cellVariantCount[cell].at(variant);
-}
-
 void initializeRandomly(EMResult& result, const std::unordered_map<size_t, bool>& forcedPhases, const size_t randomSeed)
 {
 	std::mt19937 mt(randomSeed);
@@ -185,15 +179,16 @@ double getCellLogProbDerivative(const EMResult& result, const EMHelperVariables&
 	const double f_j = helpers.cellCoverageFraction[cell];
 	assert(f_j >= 0.0 - epsilon);
 	assert(f_j <= 1.0 + epsilon);
-	for (const size_t variant : helpers.activeVariantsPerCell[cell])
+	for (const auto& t : helpers.activeVariantsPerCell[cell])
 	{
+		const size_t variant = std::get<0>(t);
+		const size_t refCount = std::get<1>(t);
+		const size_t altCount = std::get<2>(t);
 		if (ignoreTheseVariantsForNow[variant]) continue;
 		const size_t c_i = helpers.variantCoverage[variant];
 		const double Xe = result.variantEscapeFraction[variant];
 		assert(Xe >= escapeBoundary - epsilon);
 		assert(Xe <= maxEscape - escapeBoundary + epsilon);
-		const size_t refCount = getCount(helpers.cellVariantRefCount, cell, variant);
-		const size_t altCount = getCount(helpers.cellVariantAltCount, cell, variant);
 		const bool activeMatchPhase = (result.variantIsMatRef[variant] == matActive);
 		assert(refCount+altCount <= c_i);
 		if (refCount > 0)
@@ -214,15 +209,16 @@ double getCellLogProb(const EMResult& result, const EMHelperVariables& helpers, 
 	const double f_j = helpers.cellCoverageFraction[cell];
 	assert(f_j >= 0.0 - epsilon);
 	assert(f_j <= 1.0 + epsilon);
-	for (const size_t variant : helpers.activeVariantsPerCell[cell])
+	for (const auto& t : helpers.activeVariantsPerCell[cell])
 	{
+		const size_t variant = std::get<0>(t);
+		const size_t refCount = std::get<1>(t);
+		const size_t altCount = std::get<2>(t);
 		if (ignoreTheseVariantsForNow[variant]) continue;
 		const double Xe = result.variantEscapeFraction[variant];
 		assert(Xe >= escapeBoundary - epsilon);
 		assert(Xe <= maxEscape - escapeBoundary + epsilon);
 		const size_t c_i = helpers.variantCoverage[variant];
-		const size_t refCount = getCount(helpers.cellVariantRefCount, cell, variant);
-		const size_t altCount = getCount(helpers.cellVariantAltCount, cell, variant);
 		const bool activeMatchPhase = (result.variantIsMatRef[variant] == matActive);
 		assert(refCount+altCount <= c_i);
 		if (refCount > 0)
@@ -241,12 +237,13 @@ double getVariantLogProbDerivative(const EMResult& result, const EMHelperVariabl
 {
 	const size_t c_i = helpers.variantCoverage[variant];
 	double derivativeSum = 0;
-	for (const size_t cell : helpers.activeCellsPerVariant[variant])
+	for (const auto& t : helpers.activeCellsPerVariant[variant])
 	{
+		const size_t cell = std::get<0>(t);
+		const size_t refCount = std::get<1>(t);
+		const size_t altCount = std::get<2>(t);
 		const double f_j = helpers.cellCoverageFraction[cell];
 		const double Ce = result.cellEscapeFraction[cell];
-		const size_t refCount = getCount(helpers.cellVariantRefCount, cell, variant);
-		const size_t altCount = getCount(helpers.cellVariantAltCount, cell, variant);
 		const bool activeMatchPhase = (result.cellIsMatActive[cell] == matRef);
 		if (refCount > 0)
 		{
@@ -264,12 +261,13 @@ double getVariantLogProbs(const EMResult& result, const EMHelperVariables& helpe
 {
 	const size_t c_i = helpers.variantCoverage.at(variant);
 	double logProbSum = 0;
-	for (const size_t cell : helpers.activeCellsPerVariant[variant])
+	for (const auto& t : helpers.activeCellsPerVariant[variant])
 	{
+		const size_t cell = std::get<0>(t);
+		const size_t refCount = std::get<1>(t);
+		const size_t altCount = std::get<2>(t);
 		const double f_j = helpers.cellCoverageFraction[cell];
 		const double Ce = result.cellEscapeFraction[cell];
-		const size_t refCount = getCount(helpers.cellVariantRefCount, cell, variant);
-		const size_t altCount = getCount(helpers.cellVariantAltCount, cell, variant);
 		const bool activeMatchPhase = (result.cellIsMatActive[cell] == matRef);
 		if (refCount > 0)
 		{
@@ -488,10 +486,11 @@ double getNonnormalizedTotalLogProb(const EMResult& result, const EMHelperVariab
 		const double Xe = result.variantEscapeFraction.at(variant);
 		const double c_i = helpers.variantCoverage.at(variant);
 		const bool variantIsMat = result.variantIsMatRef[variant];
-		for (size_t cell : helpers.activeCellsPerVariant[variant])
+		for (const auto& t : helpers.activeCellsPerVariant[variant])
 		{
-			const size_t refCount = getCount(helpers.cellVariantRefCount, cell, variant);
-			const size_t altCount = getCount(helpers.cellVariantAltCount, cell, variant);
+			const size_t cell = std::get<0>(t);
+			const size_t refCount = std::get<1>(t);
+			const size_t altCount = std::get<2>(t);
 			const double Ce = result.cellEscapeFraction[cell];
 			const bool cellIsMat = result.cellIsMatActive[cell];
 			const double f_j = helpers.cellCoverageFraction[cell];
@@ -592,37 +591,34 @@ EMHelperVariables getHelpers(const std::vector<CellMatch>& cellMatches)
 	helpers.activeVariantsPerCell.resize(helpers.numCells());
 	helpers.variantCoverage.resize(helpers.numVariants(), 0);
 	helpers.cellCoverage.resize(helpers.numCells(), 0);
-	helpers.cellVariantAltCount.resize(helpers.numCells());
-	helpers.cellVariantRefCount.resize(helpers.numCells());
 	helpers.cellCoverageFraction.resize(helpers.numCells(), 0);
+	std::vector<std::unordered_map<size_t, std::pair<size_t, size_t>>> cellVariantRefAltCount;
+	cellVariantRefAltCount.resize(helpers.numCells());
 	for (const auto& t : cellMatches)
 	{
 		const size_t variantIndex = helpers.variantNameToIndex.at(t.variant);
 		const size_t cellIndex = helpers.cellNameToIndex.at(t.cell);
-		helpers.activeCellsPerVariant[variantIndex].emplace_back(cellIndex);
-		helpers.activeVariantsPerCell[cellIndex].emplace_back(variantIndex);
 		helpers.variantCoverage[variantIndex] += t.count;
 		helpers.cellCoverage[cellIndex] += t.count;
 		if (t.alt)
 		{
-			helpers.cellVariantAltCount[cellIndex][variantIndex] += t.count;
+			cellVariantRefAltCount[cellIndex][variantIndex].second += t.count;
 		}
 		else
 		{
-			helpers.cellVariantRefCount[cellIndex][variantIndex] += t.count;
+			cellVariantRefAltCount[cellIndex][variantIndex].first += t.count;
 		}
 	}
-	for (size_t i = 0; i < helpers.activeCellsPerVariant.size(); i++)
+	for (size_t cell = 0; cell < helpers.numCells(); cell++)
 	{
-		std::unordered_set<size_t> uniques { helpers.activeCellsPerVariant[i].begin(), helpers.activeCellsPerVariant[i].end() };
-		helpers.activeCellsPerVariant[i].clear();
-		helpers.activeCellsPerVariant[i].insert(helpers.activeCellsPerVariant[i].end(), uniques.begin(), uniques.end());
-	}
-	for (size_t i = 0; i < helpers.activeVariantsPerCell.size(); i++)
-	{
-		std::unordered_set<size_t> uniques { helpers.activeVariantsPerCell[i].begin(), helpers.activeVariantsPerCell[i].end() };
-		helpers.activeVariantsPerCell[i].clear();
-		helpers.activeVariantsPerCell[i].insert(helpers.activeVariantsPerCell[i].end(), uniques.begin(), uniques.end());
+		for (const auto& pair : cellVariantRefAltCount[cell])
+		{
+			const size_t variant = pair.first;
+			const size_t refCount = pair.second.first;
+			const size_t altCount = pair.second.second;
+			helpers.activeCellsPerVariant[variant].emplace_back(cell, refCount, altCount);
+			helpers.activeVariantsPerCell[cell].emplace_back(variant, refCount, altCount);
+		}
 	}
 	size_t totalCoverage = 0;
 	for (const auto& t : cellMatches)
@@ -654,6 +650,7 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 	ignoreNothing.resize(helpers.numVariants(), false);
 	while (true)
 	{
+		Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << "iteration " << iteration << " noise magnitude " << noise.magnitude << std::endl;
 		bool variantChanged = maximizeVariantStates(result, forcedPhases, helpers, ignoreNothing, noise);
 		if (variantChanged)
 		{

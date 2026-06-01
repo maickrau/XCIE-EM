@@ -35,10 +35,8 @@ public:
 	std::vector<size_t> variantCoverage;
 	std::vector<size_t> cellCoverage;
 	std::vector<double> cellCoverageFraction;
-	std::vector<std::unordered_map<size_t, size_t>> cellVariantRefCount;
-	std::vector<std::unordered_map<size_t, size_t>> cellVariantAltCount;
-	std::vector<std::vector<size_t>> activeCellsPerVariant;
-	std::vector<std::vector<size_t>> activeVariantsPerCell;
+	std::vector<std::vector<std::tuple<size_t, size_t, size_t>>> activeCellsPerVariant;
+	std::vector<std::vector<std::tuple<size_t, size_t, size_t>>> activeVariantsPerCell;
 	size_t numVariants() const;
 	size_t numCells() const;
 };
