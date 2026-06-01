@@ -20,13 +20,19 @@ make all
 
 ## Running
 
-First align the single cell reads to your reference and call variants. Then run [scReadCounts](https://horvathlab.github.io/NGS/SCReadCounts/) to count the ref/alt coverage per heterozygous variant per cell. Then run:
+First align the single cell reads to your reference and call variants. Make sure that the cell barcodes are in the BAM tags `CB:Z:`. Then run:
+
+```
+XCIE-EM --input-bam sorted_alignments.bam --input-vcf sample_variants.vcf --output-prefix EM_output --exclude-PAR --exclude-XIST-grch38 --annotation-gff3 gene_annotation_file.gff3
+```
+
+This will count ref/alt coverage per heterozygous variant per cell, and then estimate the variant phases and cell activities. The output is written to files which start with `EM_output`. See the section [output](#output) for explanations of all the output files.
+
+Alternatively you can use [scReadCounts](https://horvathlab.github.io/NGS/SCReadCounts/) to count the expression per heterozygous SNP per cell and then run:
 
 ```
 XCIE-EM --input-screadcounts screadcounts.output.tsv --output-prefix EM_output --exclude-PAR --exclude-XIST-grch38 --annotation-gff3 gene_annotation_file.gff3
 ```
-
-This will estimate the variant phases and cell activities. The output is written to files which start with `EM_output`. See the section [output](#output) for explanations of all the output files.
 
 The parameters `--exclude-PAR` `--exclude-XIST-grch38` are not mandatory but they improve the results by removing the PAR and XIST regions, which are difficult to phase from chrX inactivation. For other references you can also use `--exclude-XIST-grch37` or `--exclude-XIST-chm13` or manually with `--exclude-region`.
 
@@ -67,9 +73,10 @@ The pseudobulk variant and gene files have columns `pvalue_Xiover10_unadjusted` 
 
 ## Parameters
 
+- `--input-bam` and `--input-vcf`: Count SNPs from the given BAM file and use those as the input. Recommended. Requires that the cell barcode is in BAM tag `CB:Z:`.
 - `--input-screadcounts`: Take the counts from scReadCounts as input. Recommended.
 - `--input-preprocessed-table`: Take the counts from a preprocessed table.
-- `-o`: Output prefix.
+- `-o, --output-prefix`: Output prefix.
 - `--force-phase`: Use variant phasing from trio data to force the phase for some variants. This will also help guide the phasing of other variants.
 - `--annotation-gff3`: A gff3 annotation file. Used for counting pseudobulk expression per gene.
 - `--EM-noise-magnitude`: Noise added to the EM algorithm to avoid local minima. Default 20 usually works well.
