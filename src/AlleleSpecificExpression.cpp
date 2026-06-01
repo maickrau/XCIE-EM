@@ -4,6 +4,7 @@
 #include <cassert>
 #include <algorithm>
 #include <unordered_set>
+#include <zstr.hpp> //https://github.com/mateidavid/zstr
 #include "Logger.h"
 #include "EM.h"
 #include "AlleleSpecificExpression.h"
@@ -130,15 +131,14 @@ std::unordered_map<std::string, std::string> parseTags(const std::string& tagstr
 	return result;
 }
 
-std::vector<std::tuple<size_t, size_t, std::string, std::string>> getGeneInfo(const std::string gff3Path, const bool onlyProteinCoding)
+std::vector<std::tuple<size_t, size_t, std::string, std::string>> getGeneInfoFromStream(std::istream& stream, const bool onlyProteinCoding)
 {
 	std::vector<std::tuple<size_t, size_t, std::string, std::string>> result;
-	std::ifstream file { gff3Path };
-	while (file.good())
+	while (stream.good())
 	{
 		std::string line;
-		std::getline(file, line);
-		if (!file.good()) break;
+		std::getline(stream, line);
+		if (!stream.good()) break;
 		if (line.size() < 10) continue;
 		if (line[0] == '#') continue;
 		auto parts = split(line, '\t');
@@ -160,6 +160,32 @@ std::vector<std::tuple<size_t, size_t, std::string, std::string>> getGeneInfo(co
 	}
 	std::sort(result.begin(), result.end());
 	return result;
+}
+
+std::vector<std::tuple<size_t, size_t, std::string, std::string>> getGeneInfoGff3(const std::string gff3Path, const bool onlyProteinCoding)
+{
+	std::ifstream file { gff3Path };
+	return getGeneInfoFromStream(file, onlyProteinCoding);
+}
+
+std::vector<std::tuple<size_t, size_t, std::string, std::string>> getGeneInfoGff3Gz(const std::string gff3Path, const bool onlyProteinCoding)
+{
+	zstr::ifstream file { gff3Path };
+	return getGeneInfoFromStream(file, onlyProteinCoding);
+}
+
+std::vector<std::tuple<size_t, size_t, std::string, std::string>> getGeneInfo(const std::string gff3Path, const bool onlyProteinCoding)
+{
+	if (hasExtension(gff3Path, ".gff3"))
+	{
+		return getGeneInfoGff3(gff3Path, onlyProteinCoding);
+	}
+	else if (hasExtension(gff3Path, ".gff3.gz"))
+	{
+		return getGeneInfoGff3Gz(gff3Path, onlyProteinCoding);
+	}
+	std::cerr << "Unknown annotation extension. Valid extensions are .gff3 and .gff3.gz" << std::endl;
+	std::abort();
 }
 
 std::vector<PseudobulkInfo> getGenePseudobulk(const std::vector<PseudobulkInfo>& variantPseudobulk, const std::vector<std::tuple<size_t, size_t, std::string, std::string>>& geneInfo)

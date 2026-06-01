@@ -53,6 +53,24 @@ int main(int argc, char** argv)
 		std::exit(0);
 	}
 	bool paramError = false;
+	if (params.count("input-vcf") == 1)
+	{
+		std::string filename = params["input-vcf"].as<std::string>();
+		if (!hasExtension(filename, ".vcf") && !hasExtension(filename, ".vcf.gz"))
+		{
+			std::cerr << "Unknown file extension for --input-vcf. Valid extensions are .vcf and .vcf.gz" << std::endl;
+			paramError = true;
+		}
+	}
+	if (params.count("annotation-gff3") == 1)
+	{
+		std::string filename = params["annotation-gff3"].as<std::string>();
+		if (!hasExtension(filename, ".gff3") && !hasExtension(filename, ".gff3.gz"))
+		{
+			std::cerr << "Unknown file extension for --annotation-gff3. Valid extensions are .gff3 and .gff3.gz" << std::endl;
+			paramError = true;
+		}
+	}
 	if (params.count("input-preprocessed-table") == 0 && params.count("input-screadcounts") == 0 && params.count("input-bam") == 0 && params.count("input-vcf") == 0)
 	{
 		std::cerr << "Input is required" << std::endl;

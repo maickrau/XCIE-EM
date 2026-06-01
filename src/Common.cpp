@@ -160,3 +160,8 @@ double getBinomialPValueLessThan(const double p, const size_t successes, const s
 	}
 	return result;
 }
+
+bool hasExtension(const std::string& filename, const std::string& extension)
+{
+	return filename.size() > extension.size() && filename.substr(filename.size()-extension.size()) == extension;
+}

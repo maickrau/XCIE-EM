@@ -192,7 +192,8 @@ std::vector<SNPMatch> countSNPsFromBam(const std::string& bamFile, const std::un
 			for (const auto& cellpair : pospair.second)
 			{
 				parsed.emplace_back();
-				parsed.back().chromosome = variantpair.first.substr(3);
+				parsed.back().chromosome = variantpair.first;
+				if (variantpair.first.size() >= 4 && variantpair.first.substr(0, 3) == "chr") parsed.back().chromosome = variantpair.first.substr(3);
 				parsed.back().position = std::get<0>(refvariants.at(variantpair.first)[pospair.first])+1;
 				parsed.back().ref = std::get<1>(refvariants.at(variantpair.first)[pospair.first]);
 				parsed.back().alt = std::get<2>(refvariants.at(variantpair.first)[pospair.first]);
@@ -224,11 +225,11 @@ std::vector<SNPMatch> countSNPsFromBamVcf(const std::string& vcfFile, const std:
 {
 	Logger::Log.log(Logger::LogLevel::DebugInfo) << "read variants from " << vcfFile << std::endl;
 	std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> variants;
-	if (vcfFile.size() >= 4 && vcfFile.substr(vcfFile.size() - 4) == ".vcf")
+	if (hasExtension(vcfFile, ".vcf"))
 	{
 		variants = readVariantsVcf(vcfFile);
 	}
-	else if (vcfFile.size() >= 7 && vcfFile.substr(vcfFile.size() - 7) == ".vcf.gz")
+	else if (hasExtension(vcfFile, ".vcf.gz"))
 	{
 		variants = readVariantsVcfGz(vcfFile);
 	}
