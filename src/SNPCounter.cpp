@@ -213,7 +213,8 @@ std::vector<SNPMatch> countSNPsFromBam(const std::string& bamFile, const std::un
 		if (left.barcode < right.barcode) return true;
 		if (left.barcode > right.barcode) return false;
 		assert(left.ref == right.ref);
-		assert(left.alt == right.alt);
+		if (left.alt < right.alt) return true;
+		if (left.alt > right.alt) return false;
 		return false;
 	});
 	return parsed;
