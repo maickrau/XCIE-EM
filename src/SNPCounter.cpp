@@ -117,10 +117,10 @@ std::vector<SNPMatch> countSNPsFromBamVcf(const std::string& vcfFile, const std:
 	return result;
 }
 
-std::vector<CellMatch> convertSNPMatchesToCellMatches(const std::vector<SNPMatch>& snpMatches)
+std::vector<CellMatch> getSNPMatchesFromBamVcf(const std::string& bamFile, const std::string& vcfFile)
 {
 	std::vector<CellMatch> result;
-	for (const auto& item : snpMatches)
+	streamSNPsFromBam(bamFile, vcfFile, [&result](const SNPMatch& item)
 	{
 		if (item.refFwCount + item.refBwCount > 0)
 		{
@@ -138,7 +138,7 @@ std::vector<CellMatch> convertSNPMatchesToCellMatches(const std::vector<SNPMatch
 			result.back().alt = true;
 			result.back().count = item.altFwCount + item.altBwCount;
 		}
-	}
+	});
 	return result;
 }
 
