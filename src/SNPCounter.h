@@ -1,9 +1,9 @@
 #ifndef SNPCounter_h
 #define SNPCounter_h
 
-#include <algorithm>
 #include <api/BamReader.h>
 #include <unordered_map>
+#include <unordered_set>
 #include <limits>
 #include <vector>
 #include <tuple>
@@ -30,6 +30,8 @@ std::vector<SNPMatch> countSNPsFromBamVcf(const std::string& vcfFile, const std:
 std::vector<CellMatch> convertSNPMatchesToCellMatches(const std::vector<SNPMatch>& snpMatches);
 std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> readVariantsVcfParseFilename(const std::string& vcfFile);
 std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> readVariantsVcfGz(const std::string& vcfGzFile);
+void sortSNPMatches(std::vector<SNPMatch>& matches);
+std::vector<SNPMatch> parseSNPMatches(const std::string& currentChromosome, const std::tuple<size_t, char, char>& currentVariant, const std::unordered_map<std::string, std::tuple<size_t, size_t, size_t, size_t>>& matches);
 
 template <typename F>
 std::tuple<size_t, size_t> streamSNPsFromBam(const std::string& bamFile, const std::string& vcfFile, F callback)
@@ -51,6 +53,7 @@ std::tuple<size_t, size_t> streamSNPsFromBam(const std::string& bamFile, const s
 	size_t refId = std::numeric_limits<size_t>::max();
 	std::string currentChromosome = "";
 	std::unordered_map<size_t, std::unordered_map<std::string, std::tuple<size_t, size_t, size_t, size_t>>> matches;
+	std::unordered_set<std::string> processedChromosomes;
 	size_t bamAlns = 0;
 	size_t reads = 0;
 	size_t readsWithTag = 0;
@@ -70,33 +73,10 @@ std::tuple<size_t, size_t> streamSNPsFromBam(const std::string& bamFile, const s
 			std::vector<SNPMatch> parsed;
 			for (const auto& pospair : matches)
 			{
-				for (const auto& cellpair : pospair.second)
-				{
-					parsed.emplace_back();
-					parsed.back().chromosome = currentChromosome;
-					if (currentChromosome.size() >= 4 && currentChromosome.substr(0, 3) == "chr") parsed.back().chromosome = currentChromosome.substr(3);
-					parsed.back().position = std::get<0>(refvariants.at(currentChromosome)[pospair.first])+1;
-					parsed.back().ref = std::get<1>(refvariants.at(currentChromosome)[pospair.first]);
-					parsed.back().alt = std::get<2>(refvariants.at(currentChromosome)[pospair.first]);
-					parsed.back().barcode = cellpair.first;
-					parsed.back().refFwCount = std::get<0>(cellpair.second);
-					parsed.back().refBwCount = std::get<1>(cellpair.second);
-					parsed.back().altFwCount = std::get<2>(cellpair.second);
-					parsed.back().altBwCount = std::get<3>(cellpair.second);
-				}
+				auto parts = parseSNPMatches(currentChromosome, refvariants.at(currentChromosome)[pospair.first], pospair.second);
+				parsed.insert(parsed.end(), parts.begin(), parts.end());
 			}
-			std::sort(parsed.begin(), parsed.end(), [](const auto& left, const auto& right)
-			{
-				assert(left.chromosome == right.chromosome);
-				if (left.position < right.position) return true;
-				if (left.position > right.position) return false;
-				if (left.barcode < right.barcode) return true;
-				if (left.barcode > right.barcode) return false;
-				assert(left.ref == right.ref);
-				if (left.alt < right.alt) return true;
-				if (left.alt > right.alt) return false;
-				return false;
-			});
+			sortSNPMatches(parsed);
 			for (size_t i = 0; i < parsed.size(); i++)
 			{
 				callback(parsed[i]);
@@ -105,6 +85,12 @@ std::tuple<size_t, size_t> streamSNPsFromBam(const std::string& bamFile, const s
 			refId = aln.RefID;
 			currentChromosome = references[refId].RefName;
 			Logger::Log.log(Logger::LogLevel::DebugInfo) << "begin chromosome " << currentChromosome << std::endl;
+			if (processedChromosomes.count(currentChromosome) == 1)
+			{
+				std::cerr << "Input BAM is not sorted! BAM needs to be sorted." << std::endl;
+				std::abort();
+			}
+			processedChromosomes.emplace(currentChromosome);
 			currentChromosomeSNPIndex = 0;
 			lastReadStartPosition = 0;
 		}
@@ -122,33 +108,8 @@ std::tuple<size_t, size_t> streamSNPsFromBam(const std::string& bamFile, const s
 		{
 			if (matches.count(currentChromosomeSNPIndex) == 1)
 			{
-				std::vector<SNPMatch> parsed;
-				for (const auto& cellpair : matches.at(currentChromosomeSNPIndex))
-				{
-					parsed.emplace_back();
-					parsed.back().chromosome = currentChromosome;
-					if (currentChromosome.size() >= 4 && currentChromosome.substr(0, 3) == "chr") parsed.back().chromosome = currentChromosome.substr(3);
-					parsed.back().position = std::get<0>(variants[currentChromosomeSNPIndex])+1;
-					parsed.back().ref = std::get<1>(variants[currentChromosomeSNPIndex]);
-					parsed.back().alt = std::get<2>(variants[currentChromosomeSNPIndex]);
-					parsed.back().barcode = cellpair.first;
-					parsed.back().refFwCount = std::get<0>(cellpair.second);
-					parsed.back().refBwCount = std::get<1>(cellpair.second);
-					parsed.back().altFwCount = std::get<2>(cellpair.second);
-					parsed.back().altBwCount = std::get<3>(cellpair.second);
-				}
-				std::sort(parsed.begin(), parsed.end(), [](const auto& left, const auto& right)
-				{
-					assert(left.chromosome == right.chromosome);
-					if (left.position < right.position) return true;
-					if (left.position > right.position) return false;
-					if (left.barcode < right.barcode) return true;
-					if (left.barcode > right.barcode) return false;
-					assert(left.ref == right.ref);
-					if (left.alt < right.alt) return true;
-					if (left.alt > right.alt) return false;
-					return false;
-				});
+				std::vector<SNPMatch> parsed = parseSNPMatches(currentChromosome, refvariants.at(currentChromosome)[currentChromosomeSNPIndex], matches.at(currentChromosomeSNPIndex));
+				sortSNPMatches(parsed);
 				for (size_t i = 0; i < parsed.size(); i++)
 				{
 					callback(parsed[i]);
@@ -218,33 +179,10 @@ std::tuple<size_t, size_t> streamSNPsFromBam(const std::string& bamFile, const s
 	std::vector<SNPMatch> parsed;
 	for (const auto& pospair : matches)
 	{
-		for (const auto& cellpair : pospair.second)
-		{
-			parsed.emplace_back();
-			parsed.back().chromosome = currentChromosome;
-			if (currentChromosome.size() >= 4 && currentChromosome.substr(0, 3) == "chr") parsed.back().chromosome = currentChromosome.substr(3);
-			parsed.back().position = std::get<0>(refvariants.at(currentChromosome)[pospair.first])+1;
-			parsed.back().ref = std::get<1>(refvariants.at(currentChromosome)[pospair.first]);
-			parsed.back().alt = std::get<2>(refvariants.at(currentChromosome)[pospair.first]);
-			parsed.back().barcode = cellpair.first;
-			parsed.back().refFwCount = std::get<0>(cellpair.second);
-			parsed.back().refBwCount = std::get<1>(cellpair.second);
-			parsed.back().altFwCount = std::get<2>(cellpair.second);
-			parsed.back().altBwCount = std::get<3>(cellpair.second);
-		}
+		auto parts = parseSNPMatches(currentChromosome, refvariants.at(currentChromosome)[pospair.first], pospair.second);
+		parsed.insert(parsed.end(), parts.begin(), parts.end());
 	}
-	std::sort(parsed.begin(), parsed.end(), [](const auto& left, const auto& right)
-	{
-		assert(left.chromosome == right.chromosome);
-		if (left.position < right.position) return true;
-		if (left.position > right.position) return false;
-		if (left.barcode < right.barcode) return true;
-		if (left.barcode > right.barcode) return false;
-		assert(left.ref == right.ref);
-		if (left.alt < right.alt) return true;
-		if (left.alt > right.alt) return false;
-		return false;
-	});
+	sortSNPMatches(parsed);
 	for (size_t i = 0; i < parsed.size(); i++)
 	{
 		callback(parsed[i]);

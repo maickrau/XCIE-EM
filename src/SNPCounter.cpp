@@ -141,3 +141,40 @@ std::vector<CellMatch> convertSNPMatchesToCellMatches(const std::vector<SNPMatch
 	}
 	return result;
 }
+
+void sortSNPMatches(std::vector<SNPMatch>& parsed)
+{
+	std::sort(parsed.begin(), parsed.end(), [](const auto& left, const auto& right)
+	{
+		if (left.chromosome < right.chromosome) return true;
+		if (left.chromosome > right.chromosome) return false;
+		if (left.position < right.position) return true;
+		if (left.position > right.position) return false;
+		if (left.barcode < right.barcode) return true;
+		if (left.barcode > right.barcode) return false;
+		assert(left.ref == right.ref);
+		if (left.alt < right.alt) return true;
+		if (left.alt > right.alt) return false;
+		return false;
+	});
+}
+
+std::vector<SNPMatch> parseSNPMatches(const std::string& currentChromosome, const std::tuple<size_t, char, char>& currentVariant, const std::unordered_map<std::string, std::tuple<size_t, size_t, size_t, size_t>>& matches)
+{
+	std::vector<SNPMatch> parsed;
+	for (const auto& cellpair : matches)
+	{
+		parsed.emplace_back();
+		parsed.back().chromosome = currentChromosome;
+		if (currentChromosome.size() >= 4 && currentChromosome.substr(0, 3) == "chr") parsed.back().chromosome = currentChromosome.substr(3);
+		parsed.back().position = std::get<0>(currentVariant)+1;
+		parsed.back().ref = std::get<1>(currentVariant);
+		parsed.back().alt = std::get<2>(currentVariant);
+		parsed.back().barcode = cellpair.first;
+		parsed.back().refFwCount = std::get<0>(cellpair.second);
+		parsed.back().refBwCount = std::get<1>(cellpair.second);
+		parsed.back().altFwCount = std::get<2>(cellpair.second);
+		parsed.back().altBwCount = std::get<3>(cellpair.second);
+	}
+	return parsed;
+}
