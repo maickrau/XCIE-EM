@@ -20,6 +20,21 @@ const double epsilon = 0.0001; // comparisons should be strict but add an epsilo
 const double escapeBoundary = 0.001; // bounds X-chromosome inactivation escape to 0+this .. 1-this
 const double maxEscape = 1.0;
 
+struct EMCache
+{
+public:
+	std::vector<double> variantMatScores;
+	std::vector<double> variantPatScores;
+	std::vector<double> variantXeMat;
+	std::vector<double> variantXePat;
+	std::vector<bool> hasVariant;
+	std::vector<double> cellMatScores;
+	std::vector<double> cellPatScores;
+	std::vector<double> cellCeMat;
+	std::vector<double> cellCePat;
+	std::vector<bool> hasCell;
+};
+
 struct NoiseMaker
 {
 public:
@@ -363,7 +378,7 @@ std::pair<double, double> getOptimalVariantXe(const EMResult& result, const EMHe
 	return std::make_pair(matXe, patXe);
 }
 
-bool maximizeVariantStates(EMResult& result, const std::unordered_map<size_t, bool>& forcedPhases, const EMHelperVariables& helpers, const std::vector<bool>& ignoreTheseVariantsForNow, NoiseMaker& noise)
+bool maximizeVariantStates(EMResult& result, EMCache& cache, const std::unordered_map<size_t, bool>& forcedPhases, const EMHelperVariables& helpers, const std::vector<bool>& ignoreTheseVariantsForNow, NoiseMaker& noise)
 {
 	bool changed = false;
 	size_t phasesChanged = 0;
@@ -371,19 +386,31 @@ bool maximizeVariantStates(EMResult& result, const std::unordered_map<size_t, bo
 	for (size_t variant = 0; variant < result.variantIsMatRef.size(); variant++)
 	{
 		if (ignoreTheseVariantsForNow[variant]) continue;
-		double matXe = 0;
-		double patXe = 0;
-		std::tie(matXe, patXe) = getOptimalVariantXe(result, helpers, variant);
+		double matXe = cache.variantXeMat[variant];
+		double patXe = cache.variantXePat[variant];
+		bool thisChanged = false;
+		if (!cache.hasVariant[variant])
+		{
+			std::tie(matXe, patXe) = getOptimalVariantXe(result, helpers, variant);
+			cache.variantXeMat[variant] = matXe;
+			cache.variantXePat[variant] = patXe;
+			cache.hasVariant[variant] = true;
+			if (forcedPhases.count(variant) == 0)
+			{
+				cache.variantMatScores[variant] = getVariantLogProbs(result, helpers, variant, matXe, true);
+				cache.variantPatScores[variant] = getVariantLogProbs(result, helpers, variant, patXe, false);
+			}
+		}
 		if (forcedPhases.count(variant) == 0)
 		{
-			double matRefLogProbSum = getVariantLogProbs(result, helpers, variant, matXe, true) + noise.getNoise();
-			double patRefLogProbSum = getVariantLogProbs(result, helpers, variant, patXe, false) + noise.getNoise();
+			double matRefLogProbSum = cache.variantMatScores[variant] + noise.getNoise();
+			double patRefLogProbSum = cache.variantPatScores[variant] + noise.getNoise();
 			if (patRefLogProbSum > matRefLogProbSum + epsilon)
 			{
 				if (result.variantIsMatRef[variant])
 				{
 					result.variantIsMatRef[variant] = false;
-					changed = true;
+					thisChanged = true;
 					phasesChanged += 1;
 				}
 			}
@@ -392,7 +419,7 @@ bool maximizeVariantStates(EMResult& result, const std::unordered_map<size_t, bo
 				if (!result.variantIsMatRef[variant])
 				{
 					result.variantIsMatRef[variant] = true;
-					changed = true;
+					thisChanged = true;
 					phasesChanged += 1;
 				}
 			}
@@ -405,7 +432,7 @@ bool maximizeVariantStates(EMResult& result, const std::unordered_map<size_t, bo
 		{
 			if (matXe > result.variantEscapeFraction[variant]+epsilon || matXe < result.variantEscapeFraction[variant]-epsilon)
 			{
-				changed = true;
+				thisChanged = true;
 				escapeChanged += 1;
 			}
 			result.variantEscapeFraction[variant] = matXe;
@@ -414,33 +441,51 @@ bool maximizeVariantStates(EMResult& result, const std::unordered_map<size_t, bo
 		{
 			if (patXe > result.variantEscapeFraction[variant]+epsilon || patXe < result.variantEscapeFraction[variant]-epsilon)
 			{
-				changed = true;
+				thisChanged = true;
 				escapeChanged += 1;
 			}
 			result.variantEscapeFraction[variant] = patXe;
+		}
+		if (thisChanged)
+		{
+			changed = true;
+			for (const auto& t : helpers.activeCellsPerVariant[variant])
+			{
+				cache.hasCell[std::get<0>(t)] = false;
+			}
 		}
 	}
 	Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << phasesChanged << " variant phases changed, " << escapeChanged << " variant escapes changed" << std::endl;
 	return changed;
 }
 
-bool maximizeCellStates(EMResult& result, const EMHelperVariables& helpers, const std::vector<bool>& ignoreTheseVariantsForNow, NoiseMaker& noise)
+bool maximizeCellStates(EMResult& result, EMCache& cache, const EMHelperVariables& helpers, const std::vector<bool>& ignoreTheseVariantsForNow, NoiseMaker& noise)
 {
 	bool changed = false;
 	size_t cellsChanged = 0;
 	size_t escapeChanged = 0;
 	for (size_t cell = 0; cell < result.cellIsMatActive.size(); cell++)
 	{
-		double matCe, patCe;
-		std::tie(matCe, patCe) = getOptimalCellCe(result, helpers, cell, ignoreTheseVariantsForNow);
-		double matActiveLogProbSum = getCellLogProb(result, helpers, cell, matCe, true, ignoreTheseVariantsForNow) + noise.getNoise();
-		double patActiveLogProbSum = getCellLogProb(result, helpers, cell, patCe, false, ignoreTheseVariantsForNow) + noise.getNoise();
+		double matCe = cache.cellCeMat[cell];
+		double patCe = cache.cellCePat[cell];
+		if (!cache.hasCell[cell])
+		{
+			std::tie(matCe, patCe) = getOptimalCellCe(result, helpers, cell, ignoreTheseVariantsForNow);
+			cache.cellCeMat[cell] = matCe;
+			cache.cellCePat[cell] = patCe;
+			cache.hasCell[cell] = true;
+			cache.cellMatScores[cell] = getCellLogProb(result, helpers, cell, matCe, true, ignoreTheseVariantsForNow);
+			cache.cellPatScores[cell] = getCellLogProb(result, helpers, cell, patCe, false, ignoreTheseVariantsForNow);
+		}
+		bool thisChanged = false;
+		double matActiveLogProbSum = cache.cellMatScores[cell] + noise.getNoise();
+		double patActiveLogProbSum = cache.cellPatScores[cell] + noise.getNoise();
 		// should be strict comparison but add epsilon because of floating point rounding
 		if (matActiveLogProbSum > patActiveLogProbSum + epsilon)
 		{
 			if (!result.cellIsMatActive[cell])
 			{
-				changed = true;
+				thisChanged = true;
 				result.cellIsMatActive[cell] = true;
 				cellsChanged += 1;
 			}
@@ -449,7 +494,7 @@ bool maximizeCellStates(EMResult& result, const EMHelperVariables& helpers, cons
 		{
 			if (result.cellIsMatActive[cell])
 			{
-				changed = true;
+				thisChanged = true;
 				result.cellIsMatActive[cell] = false;
 				cellsChanged += 1;
 			}
@@ -458,7 +503,7 @@ bool maximizeCellStates(EMResult& result, const EMHelperVariables& helpers, cons
 		{
 			if (matCe > result.cellEscapeFraction[cell] + epsilon || matCe < result.cellEscapeFraction[cell] - epsilon)
 			{
-				changed = true;
+				thisChanged = true;
 				escapeChanged += 1;
 			}
 			result.cellEscapeFraction[cell] = matCe;
@@ -467,10 +512,18 @@ bool maximizeCellStates(EMResult& result, const EMHelperVariables& helpers, cons
 		{
 			if (patCe > result.cellEscapeFraction[cell] + epsilon || patCe < result.cellEscapeFraction[cell] - epsilon)
 			{
-				changed = true;
+				thisChanged = true;
 				escapeChanged += 1;
 			}
 			result.cellEscapeFraction[cell] = patCe;
+		}
+		if (thisChanged)
+		{
+			changed = true;
+			for (const auto& t : helpers.activeVariantsPerCell[cell])
+			{
+				cache.hasVariant[std::get<0>(t)] = false;
+			}
 		}
 	}
 	Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << cellsChanged << " cell actives changed, " << escapeChanged << " cell escapes changed" << std::endl;
@@ -648,16 +701,27 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 	noise.magnitude = initialNoiseMagnitude;
 	std::vector<bool> ignoreNothing;
 	ignoreNothing.resize(helpers.numVariants(), false);
+	EMCache cache;
+	cache.variantPatScores.resize(helpers.numVariants(), 0);
+	cache.variantMatScores.resize(helpers.numVariants(), 0);
+	cache.variantXeMat.resize(helpers.numVariants(), 0);
+	cache.variantXePat.resize(helpers.numVariants(), 0);
+	cache.hasVariant.resize(helpers.numVariants(), false);
+	cache.cellPatScores.resize(helpers.numCells(), 0);
+	cache.cellMatScores.resize(helpers.numCells(), 0);
+	cache.cellCeMat.resize(helpers.numCells(), 0);
+	cache.cellCePat.resize(helpers.numCells(), 0);
+	cache.hasCell.resize(helpers.numCells(), false);
 	while (true)
 	{
 		Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << "iteration " << iteration << " noise magnitude " << noise.magnitude << std::endl;
-		bool variantChanged = maximizeVariantStates(result, forcedPhases, helpers, ignoreNothing, noise);
+		bool variantChanged = maximizeVariantStates(result, cache, forcedPhases, helpers, ignoreNothing, noise);
 		if (variantChanged)
 		{
 			logprob = getTotalLogProb(result, helpers, ignoreNothing);
 			Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
 		}
-		bool cellChanged = maximizeCellStates(result, helpers, ignoreNothing, noise);
+		bool cellChanged = maximizeCellStates(result, cache, helpers, ignoreNothing, noise);
 		if (cellChanged)
 		{
 			logprob = getTotalLogProb(result, helpers, ignoreNothing);
