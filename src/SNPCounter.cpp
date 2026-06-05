@@ -100,6 +100,7 @@ std::string readBarcode(const BamTools::BamAlignment& aln)
 {
 	std::string result;
 	aln.GetTag("CB", result);
+	if (result == "") aln.GetTag("CR", result);
 	return result;
 }
 
@@ -122,6 +123,10 @@ std::vector<CellMatch> getSNPMatchesFromBamVcf(const std::string& bamFile, const
 	std::vector<CellMatch> result;
 	streamSNPsFromBam(bamFile, vcfFile, [&result](const SNPMatch& item)
 	{
+		if (item.chromosome != "23" && lowercase(item.chromosome) != "x" && lowercase(item.chromosome) != "chrx")
+		{
+			return;
+		}
 		if (item.refFwCount + item.refBwCount > 0)
 		{
 			result.emplace_back();
