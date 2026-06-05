@@ -22,6 +22,7 @@ int main(int argc, char** argv)
 		("o,output-prefix", "Output prefix", cxxopts::value<std::string>()->default_value("./result"))
 		("annotation-gff3", "Calculate gene level pseudobulk values based on gene annotations in this file", cxxopts::value<std::string>())
 		("force-phase", "File with pre-phased trio variants", cxxopts::value<std::string>())
+		("group-cells", "File with cell groups for pseudobulk (eg cell types)", cxxopts::value<std::string>())
 		("EM-noise-magnitude", "initial EM noise magnitude", cxxopts::value<double>()->default_value("20"))
 		("EM-noise-decay", "EM noise decay", cxxopts::value<double>()->default_value("0.95"))
 		("EM-random-seed", "Random seed for EM initialization", cxxopts::value<size_t>()->default_value("1"))
@@ -130,11 +131,21 @@ int main(int argc, char** argv)
 	{
 		forcedPhaseFile = params["force-phase"].as<std::string>();
 	}
+	std::string cellGroupFile = "";
+	if (params.count("group-cells") > 0)
+	{
+		cellGroupFile = params["group-cells"].as<std::string>();
+	}
 	size_t randomSeed = params["EM-random-seed"].as<size_t>();
 	size_t numTries = params["EM-num-runs"].as<size_t>();
 	double initialNoiseMagnitude = params["EM-noise-magnitude"].as<double>();
 	double noiseDecay = params["EM-noise-decay"].as<double>();
-	std::vector<CellMatch> cellMatches;
+	std::unordered_map<std::string, std::string> cellGrouping;
+	if (cellGroupFile != "")
+	{
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "read cell groups from " << cellGroupFile << std::endl;
+		cellGrouping = readCellGrouping(cellGroupFile);
+	}
 	std::vector<std::pair<size_t, size_t>> excludedRegions;
 	if (params.count("exclude-region") > 0)
 	{
@@ -163,6 +174,7 @@ int main(int argc, char** argv)
 		excludedRegions.emplace_back(72225527, 72286069);
 	}
 	std::sort(excludedRegions.begin(), excludedRegions.end());
+	std::vector<CellMatch> cellMatches;
 	if (params.count("input-bam") > 0)
 	{
 		std::string inputBamFile = params["input-bam"].as<std::string>();
@@ -227,6 +239,12 @@ int main(int argc, char** argv)
 	writePseudobulkResults(pseudobulkVariants2, phasesAreMatPat, "variant", outputPrefix + ".pseudobulk.variants.confidence2.tsv");
 	auto pseudobulkVariants0 = getVariantPseudobulk(output, cellMatches, 0);
 	writePseudobulkResults(pseudobulkVariants0, phasesAreMatPat, "variant", outputPrefix + ".pseudobulk.variants.confidence0.tsv");
+	if (cellGrouping.size() > 0)
+	{
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "write variant pseudobulk results per cell group" << std::endl;
+		auto pseudobulkGroup2 = getVariantGroupPseudobulk(output, cellMatches, 2, cellGrouping);
+		writePseudobulkResults(pseudobulkGroup2, phasesAreMatPat, "variant\tgroup", outputPrefix + ".pseudobulk.variants.group.confidence2.tsv");
+	}
 	if (annotationGff3 != "")
 	{
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "read gene annotations" << std::endl;
@@ -240,5 +258,11 @@ int main(int argc, char** argv)
 		writePseudobulkResults(genePseudobulk2, phasesAreMatPat, "gene_id\tgene_name", outputPrefix + ".pseudobulk.genes.confidence2.tsv");
 		auto genePseudobulk0 = getGenePseudobulk(pseudobulkVariants0, variantPerGene);
 		writePseudobulkResults(genePseudobulk2, phasesAreMatPat, "gene_id\tgene_name", outputPrefix + ".pseudobulk.genes.confidence0.tsv");
+		if (cellGrouping.size() > 0)
+		{
+			Logger::Log.log(Logger::LogLevel::DebugInfo) << "write gene pseudobulk results per cell group" << std::endl;
+			auto pseudobulkGroup2 = getGeneGroupPseudobulk(output, cellMatches, variantPerGene, 2, cellGrouping);
+			writePseudobulkResults(pseudobulkGroup2, phasesAreMatPat, "gene_id\tgene_name\tgroup", outputPrefix + ".pseudobulk.genes.group.confidence2.tsv");
+		}
 	}
 }

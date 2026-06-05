@@ -18,6 +18,11 @@ std::vector<CellMatch> readScReadCountsMatchCounts(const std::string& scReadCoun
 	}
 	std::string header;
 	std::getline(file, header);
+	if (!file.good())
+	{
+		std::cerr << "Input scReadCounts file can't be read!" << std::endl;
+		std::abort();
+	}
 	auto parts = split(header, '\t');
 	if (parts.size() != 14 || parts[0] != "CHROM" || parts[1] != "POS" || parts[2] != "REF" || parts[3] != "ALT" || parts[4] != "ReadGroup" || parts[9] != "SNVCount" || parts[10] != "RefCount")
 	{
@@ -177,6 +182,7 @@ std::pair<std::unordered_map<std::string, bool>, bool> readForcedVariantPhases(c
 	{
 		std::string line;
 		getline(file, line);
+		if (!file.good()) break;
 		if (line.size() < 3) continue;
 		std::stringstream sstr { line };
 		std::string variant;
@@ -317,4 +323,34 @@ void writeGenesPerVariant(const EMOutput& output, const std::vector<std::vector<
 		}
 		file << variantName << "\t" << variantToGeneMatch[index].size() << "\t" << join(',', geneIds) << "\t" << join(',', geneNames) << "\n";
 	}
+}
+
+std::unordered_map<std::string, std::string> readCellGrouping(const std::string& filename)
+{
+	std::ifstream file { filename };
+	std::unordered_map<std::string, std::string> result;
+	{
+		std::string header;
+		std::getline(file, header);
+		auto parts = split(header, '\t');
+		if (parts.size() != 2 || (lowercase(parts[0]) != "barcode" && lowercase(parts[0]) != "cell"))
+		{
+			std::cerr << "Invalid cell group file format. Format should have two columns with barcode on first column." << std::endl;
+			std::abort();
+		}
+	}
+	while (file.good())
+	{
+		std::string line;
+		std::getline(file, line);
+		if (!file.good()) break;
+		auto parts = split(line, '\t');
+		if (result.count(parts[0]) == 1)
+		{
+			std::cerr << "Cell group file has duplicates. Duplicate barcode: " << parts[0] << std::endl;
+			std::abort();
+		}
+		result[parts[0]] = parts[1];
+	}
+	return result;
 }
