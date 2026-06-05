@@ -76,13 +76,13 @@ std::vector<PseudobulkInfo> getVariantPseudobulk(const EMOutput& output, const s
 std::vector<PseudobulkInfo> getGenePseudobulk(const std::vector<PseudobulkInfo>& variantPseudobulk, const std::vector<std::vector<std::pair<std::string, std::string>>>& variantGeneMatch)
 {
 	assert(variantGeneMatch.size() >= variantPseudobulk.size());
-	std::map<std::vector<std::string>, std::tuple<size_t, size_t, size_t, size_t>> counts;
+	std::map<std::vector<std::pair<std::string, std::string>>, std::tuple<size_t, size_t, size_t, size_t>> counts;
 	for (const auto& t : variantPseudobulk)
 	{
-		std::vector<std::string> key;
+		std::vector<std::pair<std::string, std::string>> key;
 		for (const std::pair<std::string, std::string>& gene : variantGeneMatch[t.variantIndex])
 		{
-			key.push_back(gene.second);
+			key.emplace_back(gene.first, gene.second);
 		}
 		if (key.size() == 0) continue;
 		std::sort(key.begin(), key.end());
@@ -98,12 +98,14 @@ std::vector<PseudobulkInfo> getGenePseudobulk(const std::vector<PseudobulkInfo>&
 		assert(pair.first.size() != 0);
 		if (std::get<0>(pair.second) == 0 && std::get<1>(pair.second) == 0 && std::get<2>(pair.second) == 0 && std::get<3>(pair.second) == 0) continue;
 		result.emplace_back();
-		for (const std::string& gene : pair.first)
+		std::vector<std::string> geneIds;
+		std::vector<std::string> geneNames;
+		for (const auto& pair2 : pair.first)
 		{
-			result.back().name += gene + ",";
+			geneIds.push_back(pair2.first);
+			geneNames.push_back(pair2.second);
 		}
-		assert(result.back().name.size() >= 2);
-		result.back().name.pop_back();
+		result.back().name = join(',', geneIds) + "\t" + join(',', geneNames);
 		result.back().matXa = std::get<0>(pair.second);
 		result.back().matXi = std::get<1>(pair.second);
 		result.back().patXa = std::get<2>(pair.second);

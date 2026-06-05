@@ -149,12 +149,12 @@ void writeResultVariants(const EMOutput& result, const bool phasesAreMatPat, std
 	}
 }
 
-void writePseudobulkResults(const std::vector<PseudobulkInfo>& pseudobulk, const bool phasesAreMatPat, const std::string filename)
+void writePseudobulkResults(const std::vector<PseudobulkInfo>& pseudobulk, const bool phasesAreMatPat, const std::string& firstColumnName, const std::string filename)
 {
 	const std::string matName = matHapName(phasesAreMatPat);
 	const std::string patName = patHapName(phasesAreMatPat);
 	std::ofstream file { filename };
-	file << "variant\t" << matName << "_active_expression" << "\t" << matName << "_inactive_expression" << "\t" << patName << "_active_expression" << "\t" << patName << "_inactive_expression" << "\t" << "Xi" << "\t" << "pvalue_Xiover10_unadjusted" << "\t" << "pvalue_Xiunder10_unadjusted" << "\n";
+	file << firstColumnName << "\t" << matName << "_active_expression" << "\t" << matName << "_inactive_expression" << "\t" << patName << "_active_expression" << "\t" << patName << "_inactive_expression" << "\t" << "Xi" << "\t" << "pvalue_Xiover10_unadjusted" << "\t" << "pvalue_Xiunder10_unadjusted" << "\n";
 	for (const auto& t : pseudobulk)
 	{
 		double pValueOver = getBinomialPValueGreaterThan(0.1, t.matXi+t.patXi, t.matXa+t.matXi+t.patXa+t.patXi);

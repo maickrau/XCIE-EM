@@ -224,9 +224,9 @@ int main(int argc, char** argv)
 	}
 	Logger::Log.log(Logger::LogLevel::DebugInfo) << "write variant pseudobulk results" << std::endl;
 	auto pseudobulkVariants2 = getVariantPseudobulk(output, cellMatches, 2);
-	writePseudobulkResults(pseudobulkVariants2, phasesAreMatPat, outputPrefix + ".pseudobulk.variants.confidence2.tsv");
+	writePseudobulkResults(pseudobulkVariants2, phasesAreMatPat, "variant", outputPrefix + ".pseudobulk.variants.confidence2.tsv");
 	auto pseudobulkVariants0 = getVariantPseudobulk(output, cellMatches, 0);
-	writePseudobulkResults(pseudobulkVariants0, phasesAreMatPat, outputPrefix + ".pseudobulk.variants.confidence0.tsv");
+	writePseudobulkResults(pseudobulkVariants0, phasesAreMatPat, "variant", outputPrefix + ".pseudobulk.variants.confidence0.tsv");
 	if (annotationGff3 != "")
 	{
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "read gene annotations" << std::endl;
@@ -237,8 +237,8 @@ int main(int argc, char** argv)
 		writeGenesPerVariant(output, variantPerGene, outputPrefix + ".genes_per_variant.tsv");
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "write gene pseudobulk results" << std::endl;
 		auto genePseudobulk2 = getGenePseudobulk(pseudobulkVariants2, variantPerGene);
-		writePseudobulkResults(genePseudobulk2, phasesAreMatPat, outputPrefix + ".pseudobulk.genes.confidence2.tsv");
+		writePseudobulkResults(genePseudobulk2, phasesAreMatPat, "gene_id\tgene_name", outputPrefix + ".pseudobulk.genes.confidence2.tsv");
 		auto genePseudobulk0 = getGenePseudobulk(pseudobulkVariants0, variantPerGene);
-		writePseudobulkResults(genePseudobulk2, phasesAreMatPat, outputPrefix + ".pseudobulk.genes.confidence0.tsv");
+		writePseudobulkResults(genePseudobulk2, phasesAreMatPat, "gene_id\tgene_name", outputPrefix + ".pseudobulk.genes.confidence0.tsv");
 	}
 }
