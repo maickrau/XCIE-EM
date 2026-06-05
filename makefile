@@ -12,10 +12,10 @@ LIBS=-lbamtools
 
 LINKFLAGS= $(CPPFLAGS) `pkg-config --libs zlib` -Wl,-Bstatic $(LIBS) -Wl,-Bdynamic -Wl,--as-needed -static-libstdc++
 
-_DEPS = Logger.h Common.h FileHandler.h EM.h AlleleSpecificExpression.h SNPCounter.h
+_DEPS = Logger.h Common.h FileHandler.h EM.h AlleleSpecificExpression.h SNPCounter.h PseudobulkAnalysis.h
 DEPS = $(patsubst %, $(SRCDIR)/%, $(_DEPS))
 
-_OBJ = Logger.o Common.o FileHandler.o EM.o AlleleSpecificExpression.o SNPCounter.o
+_OBJ = Logger.o Common.o FileHandler.o EM.o AlleleSpecificExpression.o SNPCounter.o PseudobulkAnalysis.o
 OBJ = $(patsubst %, $(ODIR)/%, $(_OBJ))
 
 VERSION := Git branch $(shell git rev-parse --abbrev-ref HEAD) commit $(shell git rev-parse HEAD) $(shell git show -s --format=%ci)

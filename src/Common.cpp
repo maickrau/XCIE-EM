@@ -165,3 +165,14 @@ bool hasExtension(const std::string& filename, const std::string& extension)
 {
 	return filename.size() > extension.size() && filename.substr(filename.size()-extension.size()) == extension;
 }
+
+std::string join(const char separator, const std::vector<std::string>& strings)
+{
+	std::string result;
+	for (size_t i = 0; i < strings.size(); i++)
+	{
+		if (i > 0) result += separator;
+		result += strings[i];
+	}
+	return result;
+}

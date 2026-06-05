@@ -9,6 +9,7 @@
 std::string matHapName(const bool phasesAreMatPat);
 std::string patHapName(const bool phasesAreMatPat);
 std::vector<std::string> split(const std::string& raw, const char separator);
+std::string join(const char separator, const std::vector<std::string>& strings);
 std::string lowercase(std::string raw);
 std::vector<std::string> getVariantOrder(const std::unordered_map<std::string, size_t>& nameToIndex);
 std::vector<std::string> getCellOrder(const std::unordered_map<std::string, size_t>& nameToIndex);

@@ -7,6 +7,7 @@
 #include "Common.h"
 #include "AlleleSpecificExpression.h"
 #include "SNPCounter.h"
+#include "PseudobulkAnalysis.h"
 
 int main(int argc, char** argv)
 {
@@ -231,10 +232,13 @@ int main(int argc, char** argv)
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "read gene annotations" << std::endl;
 		auto annotation = getGeneInfo(annotationGff3, true);
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << annotation.size() << " genes included" << std::endl;
+		auto variantPerGene = getVariantGeneContainment(output, annotation);
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "write genes per variant" << std::endl;
+		writeGenesPerVariant(output, variantPerGene, outputPrefix + ".genes_per_variant.tsv");
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "write gene pseudobulk results" << std::endl;
-		auto genePseudobulk2 = getGenePseudobulk(pseudobulkVariants2, annotation);
+		auto genePseudobulk2 = getGenePseudobulk(pseudobulkVariants2, variantPerGene);
 		writePseudobulkResults(genePseudobulk2, phasesAreMatPat, outputPrefix + ".pseudobulk.genes.confidence2.tsv");
-		auto genePseudobulk0 = getGenePseudobulk(pseudobulkVariants0, annotation);
+		auto genePseudobulk0 = getGenePseudobulk(pseudobulkVariants0, variantPerGene);
 		writePseudobulkResults(genePseudobulk2, phasesAreMatPat, outputPrefix + ".pseudobulk.genes.confidence0.tsv");
 	}
 }

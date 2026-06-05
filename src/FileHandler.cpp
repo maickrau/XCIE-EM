@@ -1,7 +1,9 @@
+#include <algorithm>
 #include <sstream>
 #include <tuple>
 #include <cassert>
 #include <fstream>
+#include <zstr.hpp>
 #include "Common.h"
 #include "Logger.h"
 #include "FileHandler.h"
@@ -225,5 +227,94 @@ void writeCellMatchCounts(const std::vector<CellMatch>& cellMatches, const std::
 	for (const auto& match : cellMatches)
 	{
 		file << match.cell << "\t" << match.variant << "\t" << (match.alt ? "ALT" : "REF") << "\t" << match.count << "\n";
+	}
+}
+
+std::unordered_map<std::string, std::string> parseTagsGff3(const std::string& tagstr)
+{
+	auto parts = split(tagstr, ';');
+	std::unordered_map<std::string, std::string> result;
+	for (const std::string& tag : parts)
+	{
+		auto parts2 = split(tag, '=');
+		if (parts2.size() != 2) continue;
+		result[parts2[0]] = parts2[1];
+	}
+	return result;
+}
+
+std::vector<std::tuple<size_t, size_t, std::string, std::string>> getGeneInfoFromStream(std::istream& stream, const bool onlyProteinCoding)
+{
+	std::vector<std::tuple<size_t, size_t, std::string, std::string>> result;
+	while (stream.good())
+	{
+		std::string line;
+		std::getline(stream, line);
+		if (!stream.good()) break;
+		if (line.size() < 10) continue;
+		if (line[0] == '#') continue;
+		auto parts = split(line, '\t');
+		std::string chromosome = parts[0];
+		if (chromosome != "23" && lowercase(chromosome) != "x" && lowercase(chromosome) != "chrx") continue;
+		std::string type = parts[2];
+		if (type != "gene") continue;
+		auto tags = parseTagsGff3(parts[8]);
+		if (onlyProteinCoding)
+		{
+			if (tags.count("gene_type") == 0 || tags.at("gene_type") != "protein_coding") continue;
+		}
+		std::string geneId = tags.count("gene_id") == 1 ? tags.at("gene_id") : "";
+		std::string geneName = tags.count("gene_id") == 1 ? tags.at("gene_name") : "";
+		size_t startPos = std::stoull(parts[3]);
+		size_t endPos = std::stoull(parts[4]);
+		if (geneName == "") geneName = geneId;
+		result.emplace_back(startPos, endPos, geneId, geneName);
+	}
+	std::sort(result.begin(), result.end());
+	return result;
+}
+
+std::vector<std::tuple<size_t, size_t, std::string, std::string>> getGeneInfoGff3(const std::string gff3Path, const bool onlyProteinCoding)
+{
+	std::ifstream file { gff3Path };
+	return getGeneInfoFromStream(file, onlyProteinCoding);
+}
+
+std::vector<std::tuple<size_t, size_t, std::string, std::string>> getGeneInfoGff3Gz(const std::string gff3Path, const bool onlyProteinCoding)
+{
+	zstr::ifstream file { gff3Path };
+	return getGeneInfoFromStream(file, onlyProteinCoding);
+}
+
+std::vector<std::tuple<size_t, size_t, std::string, std::string>> getGeneInfo(const std::string gff3Path, const bool onlyProteinCoding)
+{
+	if (hasExtension(gff3Path, ".gff3"))
+	{
+		return getGeneInfoGff3(gff3Path, onlyProteinCoding);
+	}
+	else if (hasExtension(gff3Path, ".gff3.gz"))
+	{
+		return getGeneInfoGff3Gz(gff3Path, onlyProteinCoding);
+	}
+	std::cerr << "Unknown annotation extension. Valid extensions are .gff3 and .gff3.gz" << std::endl;
+	std::abort();
+}
+
+void writeGenesPerVariant(const EMOutput& output, const std::vector<std::vector<std::pair<std::string, std::string>>>& variantToGeneMatch, const std::string& filename)
+{
+	std::ofstream file { filename };
+	file << "variant\tcount_genes\tgene_ids\tgene_names" << "\n";
+	std::vector<std::string> variantOrder = getVariantOrder(output.helpers.variantNameToIndex);
+	for (const std::string& variantName : variantOrder)
+	{
+		const size_t index = output.helpers.variantNameToIndex.at(variantName);
+		std::vector<std::string> geneIds;
+		std::vector<std::string> geneNames;
+		for (const auto& pair : variantToGeneMatch[index])
+		{
+			geneIds.emplace_back(pair.first);
+			geneNames.emplace_back(pair.second);
+		}
+		file << variantName << "\t" << variantToGeneMatch[index].size() << "\t" << join(',', geneIds) << "\t" << join(',', geneNames) << "\n";
 	}
 }
