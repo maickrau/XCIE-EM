@@ -354,3 +354,36 @@ std::unordered_map<std::string, std::string> readCellGrouping(const std::string&
 	}
 	return result;
 }
+
+void writeCellGroupStatistics(const std::vector<CellMatch>& cellMatches, const std::unordered_map<std::string, std::string>& cellGrouping, const std::string& filename)
+{
+	std::unordered_map<std::string, size_t> ASEperGroup;
+	size_t ASEtotal = 0;
+	std::unordered_map<std::string, std::unordered_set<std::string>> cellsPerGroup;
+	std::unordered_set<std::string> cellsTotal;
+	for (const auto& t : cellMatches)
+	{
+		ASEtotal += t.count;
+		cellsTotal.emplace(t.cell);
+		if (cellGrouping.count(t.cell) == 1)
+		{
+			std::string group = cellGrouping.at(t.cell);
+			ASEperGroup[group] += t.count;
+			cellsPerGroup[group].emplace(t.cell);
+		}
+	}
+	std::vector<std::string> groupNames;
+	for (const auto& pair : cellsPerGroup)
+	{
+		groupNames.emplace_back(pair.first);
+	}
+	std::sort(groupNames.begin(), groupNames.end());
+	std::ofstream file { filename };
+	file << "Group\tASE\tASE_cells\n";
+	for (const std::string& group : groupNames)
+	{
+		assert(ASEperGroup.count(group) == 1);
+		file << group << "\t" << ASEperGroup.at(group) << "\t" << cellsPerGroup.at(group).size() << "\n";
+	}
+	file << "Total\t" << ASEtotal << "\t" << cellsTotal.size() << "\n";
+}

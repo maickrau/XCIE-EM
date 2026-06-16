@@ -214,6 +214,11 @@ int main(int argc, char** argv)
 		cellMatches = excludeRegions(cellMatches, excludedRegions);
 	}
 	writeCellMatchCounts(cellMatches, outputPrefix + ".preprocessed_matches.tsv");
+	if (cellGrouping.size() > 0)
+	{
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "write cell group statistics" << std::endl;
+		writeCellGroupStatistics(cellMatches, cellGrouping, outputPrefix + ".cellgroups.tsv");
+	}
 	Logger::Log.log(Logger::LogLevel::DebugInfo) << "read forced variant phases" << std::endl;
 	std::unordered_map<std::string, bool> forcedPhases;
 	bool forcedPhasesAreMatPat;
