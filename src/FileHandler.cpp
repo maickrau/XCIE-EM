@@ -361,6 +361,8 @@ void writeCellGroupStatistics(const std::vector<CellMatch>& cellMatches, const s
 	size_t ASEtotal = 0;
 	std::unordered_map<std::string, std::unordered_set<std::string>> cellsPerGroup;
 	std::unordered_set<std::string> cellsTotal;
+	size_t ASENoGroup = 0;
+	std::unordered_set<std::string> cellsNoGroup;
 	for (const auto& t : cellMatches)
 	{
 		ASEtotal += t.count;
@@ -370,6 +372,11 @@ void writeCellGroupStatistics(const std::vector<CellMatch>& cellMatches, const s
 			std::string group = cellGrouping.at(t.cell);
 			ASEperGroup[group] += t.count;
 			cellsPerGroup[group].emplace(t.cell);
+		}
+		else
+		{
+			ASENoGroup += t.count;
+			cellsNoGroup.emplace(t.cell);
 		}
 	}
 	std::vector<std::string> groupNames;
@@ -385,5 +392,6 @@ void writeCellGroupStatistics(const std::vector<CellMatch>& cellMatches, const s
 		assert(ASEperGroup.count(group) == 1);
 		file << group << "\t" << ASEperGroup.at(group) << "\t" << cellsPerGroup.at(group).size() << "\n";
 	}
+	file << "No group\t" << ASENoGroup << "\t" << cellsNoGroup.size() << "\n";
 	file << "Total\t" << ASEtotal << "\t" << cellsTotal.size() << "\n";
 }
