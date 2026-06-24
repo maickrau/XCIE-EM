@@ -386,12 +386,12 @@ void writeCellGroupStatistics(const std::vector<CellMatch>& cellMatches, const s
 	}
 	std::sort(groupNames.begin(), groupNames.end());
 	std::ofstream file { filename };
-	file << "Group\tASE\tASE_cells\n";
+	file << "Group\tASE\tASE_cells\tASE_percent\tASE_cells_percent\n";
 	for (const std::string& group : groupNames)
 	{
 		assert(ASEperGroup.count(group) == 1);
-		file << group << "\t" << ASEperGroup.at(group) << "\t" << cellsPerGroup.at(group).size() << "\n";
+		file << group << "\t" << ASEperGroup.at(group) << "\t" << cellsPerGroup.at(group).size() << "\t" << (double)ASEperGroup.at(group)/ASEtotal*100 << "\t" << (double)cellsPerGroup.at(group).size()/cellsTotal.size()*100 << "\n";
 	}
-	file << "No group\t" << ASENoGroup << "\t" << cellsNoGroup.size() << "\n";
-	file << "Total\t" << ASEtotal << "\t" << cellsTotal.size() << "\n";
+	file << "No group\t" << ASENoGroup << "\t" << cellsNoGroup.size() << "\t" << (double)ASENoGroup/ASEtotal*100 << "\t" << (double)cellsNoGroup.size()/cellsTotal.size()*100 << "\n";
+	file << "Total\t" << ASEtotal << "\t" << cellsTotal.size() << "\t100\t100" << "\n";
 }
