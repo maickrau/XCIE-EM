@@ -129,90 +129,69 @@ double logprob(const size_t n, const double cellCoverageFraction, const double v
 }
 
 // derivative by Ce
-double logprobDerivativeCe(const size_t n, const double cellCoverageFraction, const double variantCoverage, const double cellEscapeFraction, const double variantEscapeFraction, const bool active)
+// assumed to sum over all variants, in which case some terms cancel out and are left out
+// not accurate for the derivative over one variant
+inline double logprobDerivativeCe(const size_t n, const double cellEscapeFraction, const double variantEscapeFraction, const bool active)
 {
-	assert(cellCoverageFraction >= 0.0 - epsilon);
-	assert(cellCoverageFraction <= 1.0 + epsilon);
 	assert(cellEscapeFraction >= 0.0 - epsilon);
 	assert(cellEscapeFraction <= maxEscape + epsilon);
 	assert(variantEscapeFraction >= 0.0 - epsilon);
 	assert(variantEscapeFraction <= maxEscape + epsilon);
 	const double E = 1.0 - (1.0-cellEscapeFraction) * (1.0-variantEscapeFraction);
-	double lambda;
-	double lambdaDerivative;
 	if (active)
 	{
 		double Ef = 1.0 - E * 0.5;
-		lambda = cellCoverageFraction * variantCoverage * Ef;
-		lambdaDerivative = cellCoverageFraction * variantCoverage * (-1) * (1.0 - variantEscapeFraction) / 2.0;
+		return (double)n / Ef * (-1) * (1.0 - variantEscapeFraction) / 2.0;
 	}
 	else
 	{
 		double Ef = E * 0.5;
-		lambda = cellCoverageFraction * variantCoverage * Ef;
-		lambdaDerivative = cellCoverageFraction * variantCoverage * (1.0 - variantEscapeFraction) / 2.0;
+		return (double)n / Ef * (1.0 - variantEscapeFraction) / 2.0;
 	}
-	if (n == 0) return (-1) * lambdaDerivative;
-	assert(lambda > 0);
-	double result = ((double)n / lambda - 1.0) * lambdaDerivative;
-	return result;
 }
 
 // derivative by Xe
-double logprobDerivativeXe(const size_t n, const double cellCoverageFraction, const double variantCoverage, const double cellEscapeFraction, const double variantEscapeFraction, const bool active)
+// assumed to sum over all cells, in which case some terms cancel out and are left out
+// not accurate for the derivative over one cell
+inline double logprobDerivativeXe(const size_t n, const double cellEscapeFraction, const double variantEscapeFraction, const bool active)
 {
-	assert(cellCoverageFraction >= 0.0 - epsilon);
-	assert(cellCoverageFraction <= 1.0 + epsilon);
 	assert(cellEscapeFraction >= 0.0 - epsilon);
 	assert(cellEscapeFraction <= maxEscape + epsilon);
 	assert(variantEscapeFraction >= 0.0 - epsilon);
 	assert(variantEscapeFraction <= maxEscape + epsilon);
 	const double E = 1.0 - (1.0-cellEscapeFraction) * (1.0-variantEscapeFraction);
-	double lambda;
-	double lambdaDerivative;
 	if (active)
 	{
 		double Ef = 1.0 - E * 0.5;
-		lambda = cellCoverageFraction * variantCoverage * Ef;
-		lambdaDerivative = cellCoverageFraction * variantCoverage * (-1) * (1.0 - cellEscapeFraction) / 2.0;
+		return (double)n / Ef * (-1) * (1.0 - cellEscapeFraction) / 2.0;
 	}
 	else
 	{
 		double Ef = E * 0.5;
-		lambda = cellCoverageFraction * variantCoverage * Ef;
-		lambdaDerivative = cellCoverageFraction * variantCoverage * (1.0 - cellEscapeFraction) / 2.0;
+		return (double)n / Ef * (1.0 - cellEscapeFraction) / 2.0;
 	}
-	if (n == 0) return (-1) * lambdaDerivative;
-	assert(lambda > 0);
-	double result = ((double)n / lambda - 1.0) * lambdaDerivative;
-	return result;
 }
 
 double getCellLogProbDerivative(const EMResult& result, const EMHelperVariables& helpers, const size_t cell, const double Ce, const bool matActive, const std::vector<bool>& ignoreTheseVariantsForNow)
 {
 	double derivativeSum = 0;
-	const double f_j = helpers.cellCoverageFraction[cell];
-	assert(f_j >= 0.0 - epsilon);
-	assert(f_j <= 1.0 + epsilon);
 	for (const auto& t : helpers.activeVariantsPerCell[cell])
 	{
 		const size_t variant = std::get<0>(t);
 		const size_t refCount = std::get<1>(t);
 		const size_t altCount = std::get<2>(t);
 		if (ignoreTheseVariantsForNow[variant]) continue;
-		const size_t c_i = helpers.variantCoverage[variant];
 		const double Xe = result.variantEscapeFraction[variant];
 		assert(Xe >= escapeBoundary - epsilon);
 		assert(Xe <= maxEscape - escapeBoundary + epsilon);
 		const bool activeMatchPhase = (result.variantIsMatRef[variant] == matActive);
-		assert(refCount+altCount <= c_i);
 		if (refCount > 0)
 		{
-			derivativeSum += logprobDerivativeCe(refCount, f_j, c_i, Ce, Xe, activeMatchPhase) - logprobDerivativeCe(0, f_j, c_i, Ce, Xe, activeMatchPhase);
+			derivativeSum += logprobDerivativeCe(refCount, Ce, Xe, activeMatchPhase);
 		}
 		if (altCount > 0)
 		{
-			derivativeSum += logprobDerivativeCe(altCount, f_j, c_i, Ce, Xe, !activeMatchPhase) - logprobDerivativeCe(0, f_j, c_i, Ce, Xe, !activeMatchPhase);
+			derivativeSum += logprobDerivativeCe(altCount, Ce, Xe, !activeMatchPhase);
 		}
 	}
 	return derivativeSum;
@@ -250,23 +229,21 @@ double getCellLogProb(const EMResult& result, const EMHelperVariables& helpers, 
 
 double getVariantLogProbDerivative(const EMResult& result, const EMHelperVariables& helpers, const size_t variant, const double Xe, const bool matRef)
 {
-	const size_t c_i = helpers.variantCoverage[variant];
 	double derivativeSum = 0;
 	for (const auto& t : helpers.activeCellsPerVariant[variant])
 	{
 		const size_t cell = std::get<0>(t);
 		const size_t refCount = std::get<1>(t);
 		const size_t altCount = std::get<2>(t);
-		const double f_j = helpers.cellCoverageFraction[cell];
 		const double Ce = result.cellEscapeFraction[cell];
 		const bool activeMatchPhase = (result.cellIsMatActive[cell] == matRef);
 		if (refCount > 0)
 		{
-			derivativeSum += logprobDerivativeXe(refCount, f_j, c_i, Ce, Xe, activeMatchPhase) - logprobDerivativeXe(0, f_j, c_i, Ce, Xe, activeMatchPhase);
+			derivativeSum += logprobDerivativeXe(refCount, Ce, Xe, activeMatchPhase);
 		}
 		if (altCount > 0)
 		{
-			derivativeSum += logprobDerivativeXe(altCount, f_j, c_i, Ce, Xe, !activeMatchPhase) - logprobDerivativeXe(0, f_j, c_i, Ce, Xe, !activeMatchPhase);
+			derivativeSum += logprobDerivativeXe(altCount, Ce, Xe, !activeMatchPhase);
 		}
 	}
 	return derivativeSum;
