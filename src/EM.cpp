@@ -355,6 +355,184 @@ std::pair<double, double> getOptimalVariantXe(const EMResult& result, const EMHe
 	return std::make_pair(matXe, patXe);
 }
 
+void merge(std::vector<size_t>& variantParent, size_t v1, size_t v2)
+{
+	while (variantParent[v1] != variantParent[variantParent[v1]]) variantParent[v1] = variantParent[variantParent[v1]];
+	while (variantParent[v2] != variantParent[variantParent[v2]]) variantParent[v2] = variantParent[variantParent[v2]];
+	v1 = variantParent[v1];
+	v2 = variantParent[v2];
+	assert(variantParent[v1] == v1);
+	assert(variantParent[v2] == v2);
+	variantParent[v2] = v1;
+}
+
+size_t find(std::vector<size_t>& variantParent, size_t variant)
+{
+	while (variantParent[variant] != variantParent[variantParent[variant]]) variantParent[variant] = variantParent[variantParent[variant]];
+	return variantParent[variant];
+}
+
+bool flipUnsatisfiedSubgraph(EMResult& result, EMCache& cache, const EMHelperVariables& helpers, const std::unordered_map<size_t, bool>& forcedPhases)
+{
+	std::vector<size_t> variantParentSatisfied;
+	std::vector<size_t> cellParentSatisfied;
+	variantParentSatisfied.resize(helpers.numVariants());
+	cellParentSatisfied.resize(helpers.numCells());
+	for (size_t i = 0; i < helpers.numVariants(); i++)
+	{
+		variantParentSatisfied[i] = i;
+	}
+	for (size_t i = 0; i < helpers.numCells(); i++)
+	{
+		assert(helpers.activeVariantsPerCell[i].size() > 0);
+		bool foundSatisfiedEdge = false;
+		for (auto t : helpers.activeVariantsPerCell[i])
+		{
+			size_t variant = std::get<0>(t);
+			if (result.variantIsMatRef[variant] == result.cellIsMatActive[i])
+			{
+				if (std::get<1>(t) > 0)
+				{
+					foundSatisfiedEdge = true;
+					cellParentSatisfied[i] = variant;
+					break;
+				}
+			}
+			else
+			{
+				if (std::get<2>(t) > 0)
+				{
+					foundSatisfiedEdge = true;
+					cellParentSatisfied[i] = variant;
+					break;
+				}
+			}
+		}
+		if (!foundSatisfiedEdge)
+		{
+			Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << "flip subgraph with 0 variants and 1 cells (unsatisfied cell)" << std::endl;
+			result.cellIsMatActive[i] = !result.cellIsMatActive[i];
+			cache.hasCell[i] = false;
+			for (auto t : helpers.activeVariantsPerCell[i])
+			{
+				cache.hasVariant[std::get<0>(t)] = false;
+			}
+			return true;
+		}
+	}
+	for (size_t i = 0; i < helpers.numCells(); i++)
+	{
+		for (auto t : helpers.activeVariantsPerCell[i])
+		{
+			size_t variant = std::get<0>(t);
+			if (result.variantIsMatRef[variant] == result.cellIsMatActive[i])
+			{
+				if (std::get<1>(t) > 0)
+				{
+					merge(variantParentSatisfied, cellParentSatisfied[i], variant);
+				}
+			}
+			else
+			{
+				if (std::get<2>(t) > 0)
+				{
+					merge(variantParentSatisfied, cellParentSatisfied[i], variant);
+				}
+			}
+		}
+	}
+	size_t pickCluster = std::numeric_limits<size_t>::max();
+	size_t pickCluster2 = std::numeric_limits<size_t>::max();
+	for (size_t i = 0; i < helpers.numCells(); i++)
+	{
+		for (auto t : helpers.activeVariantsPerCell[i])
+		{
+			size_t variant = std::get<0>(t);
+			if (result.variantIsMatRef[variant] == result.cellIsMatActive[i])
+			{
+				if (std::get<2>(t) > 0)
+				{
+					if (find(variantParentSatisfied, variant) != find(variantParentSatisfied, cellParentSatisfied[i]))
+					{
+						pickCluster = find(variantParentSatisfied, variant);
+						pickCluster2 = find(variantParentSatisfied, cellParentSatisfied[i]);
+						break;
+					}
+				}
+			}
+			else
+			{
+				if (std::get<1>(t) > 0)
+				{
+					if (find(variantParentSatisfied, variant) != find(variantParentSatisfied, cellParentSatisfied[i]))
+					{
+						pickCluster = find(variantParentSatisfied, variant);
+						pickCluster2 = find(variantParentSatisfied, cellParentSatisfied[i]);
+						break;
+					}
+				}
+			}
+		}
+		if (pickCluster != std::numeric_limits<size_t>::max()) break;
+	}
+	if (pickCluster == std::numeric_limits<size_t>::max()) return false;
+	assert(pickCluster != pickCluster2);
+	size_t variantsInCluster1 = 0;
+	size_t cellsInCluster1 = 0;
+	size_t variantsInCluster2 = 0;
+	size_t cellsInCluster2 = 0;
+	for (size_t i = 0; i < helpers.numVariants(); i++)
+	{
+		if (find(variantParentSatisfied, i) == pickCluster)
+		{
+			variantsInCluster1 += 1;
+		}
+		if (find(variantParentSatisfied, i) == pickCluster2)
+		{
+			variantsInCluster2 += 1;
+		}
+	}
+	for (size_t i = 0; i < helpers.numCells(); i++)
+	{
+		if (find(variantParentSatisfied, cellParentSatisfied[i]) == pickCluster)
+		{
+			cellsInCluster1 += 1;
+		}
+		if (find(variantParentSatisfied, cellParentSatisfied[i]) == pickCluster2)
+		{
+			cellsInCluster2 += 1;
+		}
+	}
+	if (variantsInCluster1+cellsInCluster1 > variantsInCluster2+cellsInCluster2)
+	{
+		std::swap(pickCluster, pickCluster2);
+		std::swap(variantsInCluster1, variantsInCluster2);
+		std::swap(cellsInCluster1, cellsInCluster2);
+	}
+	for (size_t i = 0; i < helpers.numVariants(); i++)
+	{
+		if (find(variantParentSatisfied, i) != pickCluster) continue;
+		result.variantIsMatRef[i] = !result.variantIsMatRef[i];
+		cache.hasVariant[i] = false;
+		for (auto t : helpers.activeCellsPerVariant[i])
+		{
+			cache.hasCell[std::get<0>(t)] = false;
+		}
+	}
+	for (size_t i = 0; i < helpers.numCells(); i++)
+	{
+		if (find(variantParentSatisfied, cellParentSatisfied[i]) != pickCluster) continue;
+		result.cellIsMatActive[i] = !result.cellIsMatActive[i];
+		cache.hasCell[i] = false;
+		for (auto t : helpers.activeVariantsPerCell[i])
+		{
+			cache.hasVariant[std::get<0>(t)] = false;
+		}
+	}
+	Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << "flip subgraph with " << variantsInCluster1 << " variants and " << cellsInCluster1 << " cells (bigger has " << variantsInCluster2 << " variants and " << cellsInCluster2 << " cells)" << std::endl;
+	return true;
+}
+
 bool maximizeVariantStates(EMResult& result, EMCache& cache, const std::unordered_map<size_t, bool>& forcedPhases, const EMHelperVariables& helpers, const std::vector<bool>& ignoreTheseVariantsForNow, NoiseMaker& noise)
 {
 	bool changed = false;
@@ -704,6 +882,16 @@ void getMaximumLikelihoodEM(EMResult& result, const std::vector<CellMatch>& cell
 			logprob = getTotalLogProb(result, helpers, ignoreNothing);
 			Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
 		}
+		do
+		{
+			bool subgraphChanged = flipUnsatisfiedSubgraph(result, cache, helpers, forcedPhases);
+			if (subgraphChanged)
+			{
+				logprob = getTotalLogProb(result, helpers, ignoreNothing);
+				Logger::Log.log(Logger::LogLevel::DetailedDebugInfo) << "iteration " << iteration << " non-normalized log likelihood sum " << logprob << std::endl;
+				continue;
+			}
+		} while (false);
 		iteration += 1;
 		if (!cellChanged && !variantChanged)
 		{

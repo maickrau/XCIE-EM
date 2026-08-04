@@ -35,8 +35,8 @@ public:
 	std::vector<size_t> variantCoverage;
 	std::vector<size_t> cellCoverage;
 	std::vector<double> cellCoverageFraction;
-	std::vector<std::vector<std::tuple<size_t, size_t, size_t>>> activeCellsPerVariant;
-	std::vector<std::vector<std::tuple<size_t, size_t, size_t>>> activeVariantsPerCell;
+	std::vector<std::vector<std::tuple<size_t, size_t, size_t>>> activeCellsPerVariant; // cell, refCount, altCount
+	std::vector<std::vector<std::tuple<size_t, size_t, size_t>>> activeVariantsPerCell; // variant, refCount, altCount
 	size_t numVariants() const;
 	size_t numCells() const;
 };
