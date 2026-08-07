@@ -101,7 +101,7 @@ std::string readBarcode(const BamTools::BamAlignment& aln)
 	std::string result;
 	aln.GetTag("CB", result);
 	if (result == "" || result == "-") aln.GetTag("CR", result);
-	if (result == "-") result = ""
+	if (result == "-") result = "";
 	return result;
 }
 
