@@ -56,3 +56,12 @@ std::vector<CellMatch> excludeRegions(const std::vector<CellMatch>& raw, const s
 	return result;
 }
 
+std::vector<CellMatch> filterToValidBarcodes(const std::vector<CellMatch>& raw, const std::unordered_set<std::string>& validBarcodes)
+{
+	std::vector<CellMatch> result;
+	for (const auto& t : raw)
+	{
+		if (validBarcodes.count(t.cell) == 1) result.emplace_back(t);
+	}
+	return result;
+}

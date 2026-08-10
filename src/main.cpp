@@ -19,6 +19,7 @@ int main(int argc, char** argv)
 		("input-preprocessed-table", "Input prerocessed table of cell/variant matches", cxxopts::value<std::string>())
 		("input-bam", "Input aligned BAM file", cxxopts::value<std::string>())
 		("input-vcf", "Input variant VCF file", cxxopts::value<std::string>())
+		("barcode-whitelist", "Barcode whitelist file", cxxopts::value<std::string>())
 		("o,output-prefix", "Output prefix", cxxopts::value<std::string>()->default_value("./result"))
 		("annotation-gff3", "Calculate gene level pseudobulk values based on gene annotations in this file", cxxopts::value<std::string>())
 		("force-phase", "File with pre-phased trio variants", cxxopts::value<std::string>())
@@ -136,6 +137,11 @@ int main(int argc, char** argv)
 	{
 		cellGroupFile = params["group-cells"].as<std::string>();
 	}
+	std::string barcodeWhitelistFile;
+	if (params.count("barcode-whitelist") > 0)
+	{
+		barcodeWhitelistFile = params["barcode-whitelist"].as<std::string>();
+	}
 	size_t randomSeed = params["EM-random-seed"].as<size_t>();
 	size_t numTries = params["EM-num-runs"].as<size_t>();
 	double initialNoiseMagnitude = params["EM-noise-magnitude"].as<double>();
@@ -174,13 +180,15 @@ int main(int argc, char** argv)
 		excludedRegions.emplace_back(72225527, 72286069);
 	}
 	std::sort(excludedRegions.begin(), excludedRegions.end());
+	std::unordered_set<std::string> barcodeWhitelist;
+	if (barcodeWhitelistFile != "") barcodeWhitelist = readBarcodeWhitelist(barcodeWhitelistFile);
 	std::vector<CellMatch> cellMatches;
 	if (params.count("input-bam") > 0)
 	{
 		std::string inputBamFile = params["input-bam"].as<std::string>();
 		std::string inputVcfFile = params["input-vcf"].as<std::string>();
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "parse variant matches from bam " << inputBamFile << " and vcf " << inputVcfFile << std::endl;
-		cellMatches = getSNPMatchesFromBamVcf(inputBamFile, inputVcfFile);
+		cellMatches = getSNPMatchesFromBamVcf(inputBamFile, inputVcfFile, barcodeWhitelist);
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << cellMatches.size() << " count items" << std::endl;
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "filter out homozygous sites" << std::endl;
 		cellMatches = filterOutHomozygousSites(cellMatches);
@@ -212,6 +220,10 @@ int main(int argc, char** argv)
 		}
 		Logger::Log.log(Logger::LogLevel::Always) << std::endl;
 		cellMatches = excludeRegions(cellMatches, excludedRegions);
+	}
+	if (barcodeWhitelist.size() > 0)
+	{
+		cellMatches = filterToValidBarcodes(cellMatches, barcodeWhitelist);
 	}
 	writeCellMatchCounts(cellMatches, outputPrefix + ".preprocessed_matches.tsv");
 	if (cellGrouping.size() > 0)

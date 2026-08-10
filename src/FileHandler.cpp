@@ -395,3 +395,16 @@ void writeCellGroupStatistics(const std::vector<CellMatch>& cellMatches, const s
 	file << "No group\t" << ASENoGroup << "\t" << cellsNoGroup.size() << "\t" << (double)ASENoGroup/ASEtotal*100 << "\t" << (double)cellsNoGroup.size()/cellsTotal.size()*100 << "\n";
 	file << "Total\t" << ASEtotal << "\t" << cellsTotal.size() << "\t100\t100" << "\n";
 }
+
+std::unordered_set<std::string> readBarcodeWhitelist(const std::string& barcodeWhitelistFile)
+{
+	std::ifstream file { barcodeWhitelistFile };
+	std::unordered_set<std::string> result;
+	while (file.good())
+	{
+		std::string barcode;
+		file >> barcode;
+		if (barcode.size() > 0) result.emplace(barcode);
+	}
+	return result;
+}

@@ -20,5 +20,6 @@ std::vector<std::tuple<size_t, size_t, std::string, std::string>> getGeneInfo(co
 void writeGenesPerVariant(const EMOutput& output, const std::vector<std::vector<std::pair<std::string, std::string>>>& variantToGeneMatch, const std::string& filename);
 std::unordered_map<std::string, std::string> readCellGrouping(const std::string& filename);
 void writeCellGroupStatistics(const std::vector<CellMatch>& cellMatches, const std::unordered_map<std::string, std::string>& cellGrouping, const std::string& filename);
+std::unordered_set<std::string> readBarcodeWhitelist(const std::string& barcodeWhitelistFile);
 
 #endif

@@ -129,15 +129,16 @@ std::vector<SNPMatch> countSNPsFromBamVcf(const std::string& vcfFile, const std:
 	return result;
 }
 
-std::vector<CellMatch> getSNPMatchesFromBamVcf(const std::string& bamFile, const std::string& vcfFile)
+std::vector<CellMatch> getSNPMatchesFromBamVcf(const std::string& bamFile, const std::string& vcfFile, const std::unordered_set<std::string>& barcodeWhitelist)
 {
 	std::vector<CellMatch> result;
-	streamSNPsFromBam(bamFile, vcfFile, [&result](const SNPMatch& item)
+	streamSNPsFromBam(bamFile, vcfFile, [&result, &barcodeWhitelist](const SNPMatch& item)
 	{
 		if (item.chromosome != "23" && lowercase(item.chromosome) != "x" && lowercase(item.chromosome) != "chrx")
 		{
 			return;
 		}
+		if (barcodeWhitelist.size() > 0 && barcodeWhitelist.count(item.barcode) == 0) return;
 		if (item.refFwCount + item.refBwCount > 0)
 		{
 			result.emplace_back();

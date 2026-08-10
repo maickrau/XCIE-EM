@@ -28,7 +28,7 @@ public:
 std::string readBarcode(const BamTools::BamAlignment& aln);
 std::string readUMI(const BamTools::BamAlignment& aln);
 std::vector<SNPMatch> countSNPsFromBamVcf(const std::string& vcfFile, const std::string& bamFile);
-std::vector<CellMatch> getSNPMatchesFromBamVcf(const std::string& bamFile, const std::string& vcfFile);
+std::vector<CellMatch> getSNPMatchesFromBamVcf(const std::string& bamFile, const std::string& vcfFile, const std::unordered_set<std::string>& barcodeWhitelist);
 std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> readVariantsVcfParseFilename(const std::string& vcfFile);
 std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> readVariantsVcfGz(const std::string& vcfGzFile);
 void sortSNPMatches(std::vector<SNPMatch>& matches);
