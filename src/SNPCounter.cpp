@@ -105,6 +105,16 @@ std::string readBarcode(const BamTools::BamAlignment& aln)
 	return result;
 }
 
+std::string readUMI(const BamTools::BamAlignment& aln)
+{
+	std::string result;
+	aln.GetTag("UB", result);
+	if (result == "" || result == "-") aln.GetTag("UR", result);
+	if (result == "" || result == "-") aln.GetTag("XM", result);
+	if (result == "-") result = "";
+	return result;
+}
+
 std::vector<SNPMatch> countSNPsFromBamVcf(const std::string& vcfFile, const std::string& bamFile)
 {
 	std::vector<SNPMatch> result;
@@ -165,10 +175,21 @@ void sortSNPMatches(std::vector<SNPMatch>& parsed)
 	});
 }
 
-std::vector<SNPMatch> parseSNPMatches(const std::string& currentChromosome, const std::tuple<size_t, char, char>& currentVariant, const std::unordered_map<std::string, std::tuple<size_t, size_t, size_t, size_t>>& matches)
+std::vector<SNPMatch> parseSNPMatches(const std::string& currentChromosome, const std::tuple<size_t, char, char>& currentVariant, const std::unordered_map<std::string, std::unordered_map<std::string, std::tuple<bool, bool, bool, bool>>>& matches)
 {
 	std::vector<SNPMatch> parsed;
+	std::unordered_map<std::string, std::tuple<size_t, size_t, size_t, size_t>> matchesPerBarcode;
 	for (const auto& cellpair : matches)
+	{
+		for (const auto& umipair : cellpair.second)
+		{
+			if (std::get<0>(umipair.second)) std::get<0>(matchesPerBarcode[cellpair.first]) += 1;
+			if (std::get<1>(umipair.second)) std::get<1>(matchesPerBarcode[cellpair.first]) += 1;
+			if (std::get<2>(umipair.second)) std::get<2>(matchesPerBarcode[cellpair.first]) += 1;
+			if (std::get<3>(umipair.second)) std::get<3>(matchesPerBarcode[cellpair.first]) += 1;
+		}
+	}
+	for (const auto& cellpair : matchesPerBarcode)
 	{
 		parsed.emplace_back();
 		parsed.back().chromosome = currentChromosome;

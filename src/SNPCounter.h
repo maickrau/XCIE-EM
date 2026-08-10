@@ -26,12 +26,13 @@ public:
 };
 
 std::string readBarcode(const BamTools::BamAlignment& aln);
+std::string readUMI(const BamTools::BamAlignment& aln);
 std::vector<SNPMatch> countSNPsFromBamVcf(const std::string& vcfFile, const std::string& bamFile);
 std::vector<CellMatch> getSNPMatchesFromBamVcf(const std::string& bamFile, const std::string& vcfFile);
 std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> readVariantsVcfParseFilename(const std::string& vcfFile);
 std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> readVariantsVcfGz(const std::string& vcfGzFile);
 void sortSNPMatches(std::vector<SNPMatch>& matches);
-std::vector<SNPMatch> parseSNPMatches(const std::string& currentChromosome, const std::tuple<size_t, char, char>& currentVariant, const std::unordered_map<std::string, std::tuple<size_t, size_t, size_t, size_t>>& matches);
+std::vector<SNPMatch> parseSNPMatches(const std::string& currentChromosome, const std::tuple<size_t, char, char>& currentVariant, const std::unordered_map<std::string, std::unordered_map<std::string, std::tuple<bool, bool, bool, bool>>>& matches);
 
 template <typename F>
 std::tuple<size_t, size_t> streamSNPsFromBam(const std::string& bamFile, const std::string& vcfFile, F callback)
@@ -52,7 +53,7 @@ std::tuple<size_t, size_t> streamSNPsFromBam(const std::string& bamFile, const s
 	size_t currentChromosomeSNPIndex = 0;
 	size_t refId = std::numeric_limits<size_t>::max();
 	std::string currentChromosome = "";
-	std::unordered_map<size_t, std::unordered_map<std::string, std::tuple<size_t, size_t, size_t, size_t>>> matches;
+	std::unordered_map<size_t, std::unordered_map<std::string, std::unordered_map<std::string, std::tuple<bool, bool, bool, bool>>>> matches;
 	std::unordered_set<std::string> processedChromosomes;
 	size_t bamAlns = 0;
 	size_t reads = 0;
@@ -122,7 +123,9 @@ std::tuple<size_t, size_t> streamSNPsFromBam(const std::string& bamFile, const s
 		size_t refpos = aln.Position;
 		size_t readpos = 0;
 		std::string barcode = readBarcode(aln);
+		std::string umi = readUMI(aln);
 		if (barcode == "") continue;
+		if (umi == "") continue;
 		readsWithTag += 1;
 		for (const auto& cigar : aln.CigarData)
 		{
@@ -151,11 +154,11 @@ std::tuple<size_t, size_t> streamSNPsFromBam(const std::string& bamFile, const s
 					matchCount += 1;
 					if (aln.IsReverseStrand())
 					{
-						std::get<1>(matches[j][barcode]) += 1;
+						std::get<1>(matches[j][barcode][umi]) = true;
 					}
 					else
 					{
-						std::get<0>(matches[j][barcode]) += 1;
+						std::get<0>(matches[j][barcode][umi]) = true;
 					}
 				}
 				if (readNucleotide == std::get<2>(variants[j]))
@@ -163,11 +166,11 @@ std::tuple<size_t, size_t> streamSNPsFromBam(const std::string& bamFile, const s
 					matchCount += 1;
 					if (aln.IsReverseStrand())
 					{
-						std::get<3>(matches[j][barcode]) += 1;
+						std::get<3>(matches[j][barcode][umi]) = true;
 					}
 					else
 					{
-						std::get<2>(matches[j][barcode]) += 1;
+						std::get<2>(matches[j][barcode][umi]) = true;
 					}
 				}
 				j += 1;
