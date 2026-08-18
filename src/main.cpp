@@ -17,7 +17,7 @@ int main(int argc, char** argv)
 		("v,version", "Print version")
 		("input-screadcounts", "Input scReadCounts cell/variant match table", cxxopts::value<std::string>())
 		("input-preprocessed-table", "Input prerocessed table of cell/variant matches", cxxopts::value<std::string>())
-		("input-bam", "Input aligned BAM file", cxxopts::value<std::string>())
+		("input-bam", "Input aligned BAM file", cxxopts::value<std::vector<std::string>>())
 		("input-vcf", "Input variant VCF file", cxxopts::value<std::string>())
 		("barcode-whitelist", "Barcode whitelist file", cxxopts::value<std::string>())
 		("o,output-prefix", "Output prefix", cxxopts::value<std::string>()->default_value("./result"))
@@ -79,7 +79,7 @@ int main(int argc, char** argv)
 		std::cerr << "Input is required" << std::endl;
 		paramError = true;
 	}
-	if (params.count("input-bam") == 1 && params.count("input-vcf") == 0)
+	if (params.count("input-bam") >= 1 && params.count("input-vcf") == 0)
 	{
 		std::cerr << "--input-bam also requires --input-vcf" << std::endl;
 		paramError = true;
@@ -89,7 +89,7 @@ int main(int argc, char** argv)
 		std::cerr << "--input-vcf also requires --input-bam" << std::endl;
 		paramError = true;
 	}
-	if (params.count("input-preprocessed-table") + params.count("input-screadcounts") + (params.count("input-bam") == 1 && params.count("input-vcf") == 1 ? 1 : 0) > 1)
+	if (params.count("input-preprocessed-table") + params.count("input-screadcounts") + (params.count("input-bam") >= 1 && params.count("input-vcf") == 1 ? 1 : 0) > 1)
 	{
 		std::cerr << "Use only one input" << std::endl;
 		paramError = true;
@@ -185,10 +185,12 @@ int main(int argc, char** argv)
 	std::vector<CellMatch> cellMatches;
 	if (params.count("input-bam") > 0)
 	{
-		std::string inputBamFile = params["input-bam"].as<std::string>();
+		std::vector<std::string> inputBamFiles = params["input-bam"].as<std::vector<std::string>>();
 		std::string inputVcfFile = params["input-vcf"].as<std::string>();
-		Logger::Log.log(Logger::LogLevel::DebugInfo) << "parse variant matches from bam " << inputBamFile << " and vcf " << inputVcfFile << std::endl;
-		cellMatches = getSNPMatchesFromBamVcf(inputBamFile, inputVcfFile, barcodeWhitelist);
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "parse variant matches from bam";
+		for (auto file : inputBamFiles) Logger::Log.log(Logger::LogLevel::DebugInfo) << " " << file;
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << " and vcf " << inputVcfFile << std::endl;
+		cellMatches = getSNPMatchesFromBamVcf(inputBamFiles, inputVcfFile, barcodeWhitelist);
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << cellMatches.size() << " count items" << std::endl;
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "filter out homozygous sites" << std::endl;
 		cellMatches = filterOutHomozygousSites(cellMatches);

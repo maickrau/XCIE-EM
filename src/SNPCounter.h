@@ -29,15 +29,15 @@ std::string readBarcode(const BamTools::BamAlignment& aln);
 std::string readUMI(const BamTools::BamAlignment& aln);
 std::vector<SNPMatch> countSNPsFromBamVcf(const std::string& vcfFile, const std::string& bamFile);
 std::vector<CellMatch> getSNPMatchesFromBamVcf(const std::string& bamFile, const std::string& vcfFile, const std::unordered_set<std::string>& barcodeWhitelist);
+std::vector<CellMatch> getSNPMatchesFromBamVcf(const std::vector<std::string>& bamFiles, const std::string& vcfFile, const std::unordered_set<std::string>& barcodeWhitelist);
 std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> readVariantsVcfParseFilename(const std::string& vcfFile);
 std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> readVariantsVcfGz(const std::string& vcfGzFile);
 void sortSNPMatches(std::vector<SNPMatch>& matches);
 std::vector<SNPMatch> parseSNPMatches(const std::string& currentChromosome, const std::tuple<size_t, char, char>& currentVariant, const std::unordered_map<std::string, std::unordered_map<std::string, std::tuple<bool, bool, bool, bool>>>& matches);
 
 template <typename F>
-std::tuple<size_t, size_t> streamSNPsFromBam(const std::string& bamFile, const std::string& vcfFile, F callback)
+std::tuple<size_t, size_t> streamSNPsFromBam(const std::string& bamFile, const std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>>& refvariants, F callback)
 {
-	std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> refvariants = readVariantsVcfParseFilename(vcfFile);
 	Logger::Log.log(Logger::LogLevel::DebugInfo) << "read bam from " << bamFile << std::endl;
 	BamTools::BamReader reader;
 	if (!reader.Open(bamFile))
