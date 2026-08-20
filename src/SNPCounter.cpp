@@ -50,6 +50,18 @@ std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> rea
 		// skip non-SNPs
 		if (ref.size() != 1) continue;
 		if (alt.size() != 1) continue;
+		if (ref == ".") continue;
+		if (alt == ".") continue;
+		if (ref == "a") ref = "A";
+		if (ref == "c") ref = "C";
+		if (ref == "g") ref = "G";
+		if (ref == "t") ref = "T";
+		if (alt == "a") alt = "A";
+		if (alt == "c") alt = "C";
+		if (alt == "g") alt = "G";
+		if (alt == "t") alt = "T";
+		if (ref != "A" && ref != "C" && ref != "G" && ref != "T") continue;
+		if (alt != "A" && alt != "C" && alt != "G" && alt != "T") continue;
 		result[chromosome].emplace_back(pos, ref[0], alt[0]);
 	}
 	return result;
@@ -136,7 +148,7 @@ std::vector<CellMatch> getSNPMatchesFromBamVcf(const std::vector<std::string>& b
 	std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> refvariants = readVariantsVcfParseFilename(vcfFile);
 	for (const std::string& bamFile : bamFiles)
 	{
-		streamSNPsFromBam(bamFile, refvariants, [&result, &barcodeWhitelist](const SNPMatch& item)
+		auto counts = streamSNPsFromBam(bamFile, refvariants, [&result, &barcodeWhitelist](const SNPMatch& item)
 		{
 			if (item.chromosome != "23" && lowercase(item.chromosome) != "x" && lowercase(item.chromosome) != "chrx")
 			{
@@ -160,6 +172,8 @@ std::vector<CellMatch> getSNPMatchesFromBamVcf(const std::vector<std::string>& b
 				result.back().count = item.altFwCount + item.altBwCount;
 			}
 		});
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << std::get<0>(counts) << " reads" << std::endl;
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << std::get<1>(counts) << " read-variant matches" << std::endl;
 	}
 	return result;
 }

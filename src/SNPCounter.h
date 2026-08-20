@@ -149,6 +149,10 @@ std::tuple<size_t, size_t> streamSNPsFromBam(const std::string& bamFile, const s
 				size_t variantPositionInRead = readpos+(std::get<0>(variants[j])-refpos);
 				assert(variantPositionInRead < aln.QueryBases.size());
 				char readNucleotide = aln.QueryBases[variantPositionInRead];
+				if (readNucleotide == 'a') readNucleotide = 'A';
+				if (readNucleotide == 'c') readNucleotide = 'C';
+				if (readNucleotide == 'g') readNucleotide = 'G';
+				if (readNucleotide == 't') readNucleotide = 'T';
 				if (readNucleotide == std::get<1>(variants[j]))
 				{
 					matchCount += 1;
