@@ -28,11 +28,13 @@ int main(int argc, char** argv)
 		("EM-noise-decay", "EM noise decay", cxxopts::value<double>()->default_value("0.95"))
 		("EM-random-seed", "Random seed for EM initialization", cxxopts::value<size_t>()->default_value("1"))
 		("EM-num-runs", "Number of runs for EM", cxxopts::value<size_t>()->default_value("10"))
+		("defaults-grch37", "Use default region exclusion and variant weights for grch37 reference")
+		("defaults-grch38", "Use default region exclusion and variant weights for grch38 reference")
+		("defaults-chm13", "Use default region exclusion and variant weights for chm13 reference")
+		("XIST-region", "Mark a region as the XIST region, which is assumed to have higher expression from the inactive chrX than the active chrX", cxxopts::value<std::vector<std::string>>())
+		("PAR-region", "Mark a region as PAR region, which is assumed to have very similar expression between the inactive chrX and the active chrX", cxxopts::value<std::vector<std::string>>())
 		("exclude-region", "Exclude regions", cxxopts::value<std::vector<std::string>>())
 		("exclude-PAR", "Exclude the PAR region. Equivalent to \"--exclude-region chrX:0-3500000\"")
-		("exclude-XIST-grch38", "Exclude the XIST and TSIX genes in grch38 coordinates. Equivalent to \"--exclude-region chrX:73792204-73852753\"")
-		("exclude-XIST-grch37", "Exclude the XIST and TSIX genes in grch37 coordinates. Equivalent to \"--exclude-region chrX:73012040-73072588\"")
-		("exclude-XIST-chm13", "Exclude the XIST and TSIX genes in chm13 coordinates. Equivalent to \"--exclude-region chrX:72225527-72286069\"")
 		("verbose", "Print more information while running")
 	;
 	cxxopts::ParseResult params;
@@ -104,6 +106,30 @@ int main(int argc, char** argv)
 		std::cerr << "Noise magnitude must be 0 or positive" << std::endl;
 		paramError = true;
 	}
+	if (params.count("XIST-region") > 0)
+	{
+		for (std::string value : params["XIST-region"].as<std::vector<std::string>>())
+		{
+			std::tuple<std::string, size_t, size_t> region = parseBedRegion(value);
+			if (std::get<0>(region) == "" && std::get<1>(region) == std::numeric_limits<size_t>::max() && std::get<2>(region) == std::numeric_limits<size_t>::max())
+			{
+				std::cerr << "Could not parse region \"" << value << "\". Regions should be in format chrX:1-3000000" << std::endl;
+				paramError = true;
+			}
+		}
+	}
+	if (params.count("PAR-region") > 0)
+	{
+		for (std::string value : params["PAR-region"].as<std::vector<std::string>>())
+		{
+			std::tuple<std::string, size_t, size_t> region = parseBedRegion(value);
+			if (std::get<0>(region) == "" && std::get<1>(region) == std::numeric_limits<size_t>::max() && std::get<2>(region) == std::numeric_limits<size_t>::max())
+			{
+				std::cerr << "Could not parse region \"" << value << "\". Regions should be in format chrX:1-3000000" << std::endl;
+				paramError = true;
+			}
+		}
+	}
 	if (params.count("exclude-region") > 0)
 	{
 		for (std::string value : params["exclude-region"].as<std::vector<std::string>>())
@@ -152,6 +178,27 @@ int main(int argc, char** argv)
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "read cell groups from " << cellGroupFile << std::endl;
 		cellGrouping = readCellGrouping(cellGroupFile);
 	}
+	std::vector<std::tuple<size_t, size_t, double>> regionWeights;
+	if (params.count("XIST-region") > 0)
+	{
+		for (std::string value : params["XIST-region"].as<std::vector<std::string>>())
+		{
+			std::tuple<std::string, size_t, size_t> region = parseBedRegion(value);
+			std::string chromosome = std::get<0>(region);
+			if (chromosome != "23" && lowercase(chromosome) != "x" && lowercase(chromosome) != "chrx") continue;
+			regionWeights.emplace_back(std::get<1>(region), std::get<2>(region), -1);
+		}
+	}
+	if (params.count("PAR-region") > 0)
+	{
+		for (std::string value : params["PAR-region"].as<std::vector<std::string>>())
+		{
+			std::tuple<std::string, size_t, size_t> region = parseBedRegion(value);
+			std::string chromosome = std::get<0>(region);
+			if (chromosome != "23" && lowercase(chromosome) != "x" && lowercase(chromosome) != "chrx") continue;
+			regionWeights.emplace_back(std::get<1>(region), std::get<2>(region), 0.1);
+		}
+	}
 	std::vector<std::pair<size_t, size_t>> excludedRegions;
 	if (params.count("exclude-region") > 0)
 	{
@@ -167,17 +214,20 @@ int main(int argc, char** argv)
 	{
 		excludedRegions.emplace_back(0, 3500000);
 	}
-	if (params.count("exclude-XIST-grch38"))
+	if (params.count("defaults-grch38"))
 	{
-		excludedRegions.emplace_back(73792204, 73852753);
+		regionWeights.emplace_back(73792204, 73852753, -1);
+		regionWeights.emplace_back(0, 3500000, 0.1);
 	}
-	if (params.count("exclude-XIST-grch37"))
+	if (params.count("defaults-grch37"))
 	{
-		excludedRegions.emplace_back(73012040, 73072588);
+		regionWeights.emplace_back(73012040, 73072588, -1);
+		regionWeights.emplace_back(0, 3500000, 0.1);
 	}
-	if (params.count("exclude-XIST-chm13"))
+	if (params.count("defaults-chm13"))
 	{
-		excludedRegions.emplace_back(72225527, 72286069);
+		regionWeights.emplace_back(72225527, 72286069, -1);
+		regionWeights.emplace_back(0, 3500000, 0.1);
 	}
 	std::sort(excludedRegions.begin(), excludedRegions.end());
 	std::unordered_set<std::string> barcodeWhitelist;
@@ -223,6 +273,15 @@ int main(int argc, char** argv)
 		Logger::Log.log(Logger::LogLevel::Always) << std::endl;
 		cellMatches = excludeRegions(cellMatches, excludedRegions);
 	}
+	if (regionWeights.size() > 0)
+	{
+		Logger::Log.log(Logger::LogLevel::Always) << "region weights:";
+		for (auto t : regionWeights)
+		{
+			Logger::Log.log(Logger::LogLevel::Always) << " " << std::get<0>(t) << "-" << std::get<1>(t) << " " << std::get<2>(t);
+		}
+		Logger::Log.log(Logger::LogLevel::Always) << std::endl;
+	}
 	if (barcodeWhitelist.size() > 0)
 	{
 		cellMatches = filterToValidBarcodes(cellMatches, barcodeWhitelist);
@@ -238,7 +297,7 @@ int main(int argc, char** argv)
 	bool forcedPhasesAreMatPat;
 	std::tie(forcedPhases, forcedPhasesAreMatPat) = readForcedVariantPhases(forcedPhaseFile);
 	bool phasesAreMatPat = (forcedPhases.size() > 0) && forcedPhasesAreMatPat;
-	EMOutput output = runEM(cellMatches, forcedPhases, randomSeed, initialNoiseMagnitude, noiseDecay, numTries);
+	EMOutput output = runEM(cellMatches, forcedPhases, randomSeed, initialNoiseMagnitude, noiseDecay, numTries, regionWeights);
 	{
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "write variant results" << std::endl;
 		std::ofstream variantResult { outputPrefix + ".variants.tsv" };

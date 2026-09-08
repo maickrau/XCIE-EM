@@ -35,6 +35,7 @@ public:
 	std::vector<size_t> variantCoverage;
 	std::vector<size_t> cellCoverage;
 	std::vector<double> cellCoverageFraction;
+	std::vector<double> variantWeight;
 	std::vector<std::vector<std::tuple<size_t, size_t, size_t>>> activeCellsPerVariant; // cell, refCount, altCount
 	std::vector<std::vector<std::tuple<size_t, size_t, size_t>>> activeVariantsPerCell; // variant, refCount, altCount
 	size_t numVariants() const;
@@ -49,6 +50,6 @@ public:
 	EMResultAdditions additions;
 };
 
-EMOutput runEM(const std::vector<CellMatch>& cellMatches, const std::unordered_map<std::string, bool>& forcedPhases, const size_t randomSeed, const double initialNoiseMagnitude, const double noiseDecay, const size_t numTries);
+EMOutput runEM(const std::vector<CellMatch>& cellMatches, const std::unordered_map<std::string, bool>& forcedPhases, const size_t randomSeed, const double initialNoiseMagnitude, const double noiseDecay, const size_t numTries, const std::vector<std::tuple<size_t, size_t, double>>& regionWeights);
 
 #endif
