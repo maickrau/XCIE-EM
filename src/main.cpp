@@ -18,6 +18,7 @@ int main(int argc, char** argv)
 		("input-screadcounts", "Input scReadCounts cell/variant match table", cxxopts::value<std::string>())
 		("input-preprocessed-table", "Input prerocessed table of cell/variant matches", cxxopts::value<std::string>())
 		("input-bam", "Input aligned BAM file", cxxopts::value<std::vector<std::string>>())
+		("merge-bam-barcodes", "Merge cell barcodes by treating the same barcode as the same cell across different BAMs")
 		("input-vcf", "Input variant VCF file", cxxopts::value<std::string>())
 		("barcode-whitelist", "Barcode whitelist file", cxxopts::value<std::string>())
 		("o,output-prefix", "Output prefix", cxxopts::value<std::string>()->default_value("./result"))
@@ -235,12 +236,13 @@ int main(int argc, char** argv)
 	std::vector<CellMatch> cellMatches;
 	if (params.count("input-bam") > 0)
 	{
+		bool mergeBamBarcodes = params.count("merge-bam-barcodes") > 0;
 		std::vector<std::string> inputBamFiles = params["input-bam"].as<std::vector<std::string>>();
 		std::string inputVcfFile = params["input-vcf"].as<std::string>();
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "parse variant matches from bam";
 		for (auto file : inputBamFiles) Logger::Log.log(Logger::LogLevel::DebugInfo) << " " << file;
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << " and vcf " << inputVcfFile << std::endl;
-		cellMatches = getSNPMatchesFromBamVcf(inputBamFiles, inputVcfFile, barcodeWhitelist);
+		cellMatches = getSNPMatchesFromBamVcf(inputBamFiles, inputVcfFile, barcodeWhitelist, mergeBamBarcodes);
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << cellMatches.size() << " count items" << std::endl;
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "filter out homozygous sites" << std::endl;
 		cellMatches = filterOutHomozygousSites(cellMatches);

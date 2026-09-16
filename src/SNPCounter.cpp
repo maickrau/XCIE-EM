@@ -142,13 +142,26 @@ std::vector<SNPMatch> countSNPsFromBamVcf(const std::string& vcfFile, const std:
 	return result;
 }
 
-std::vector<CellMatch> getSNPMatchesFromBamVcf(const std::vector<std::string>& bamFiles, const std::string& vcfFile, const std::unordered_set<std::string>& barcodeWhitelist)
+std::string parseFilenameNoDirectory(const std::string& filename)
+{
+	size_t lastSlash = 0;
+	for (size_t i = 0; i < filename.size(); i++)
+	{
+		if (filename[i] == '/' || filename[i] == '\\') lastSlash = i+1;
+	}
+	return filename.substr(lastSlash);
+}
+
+std::vector<CellMatch> getSNPMatchesFromBamVcf(const std::vector<std::string>& bamFiles, const std::string& vcfFile, const std::unordered_set<std::string>& barcodeWhitelist, bool mergeBamBarcodes)
 {
 	std::vector<CellMatch> result;
 	std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> refvariants = readVariantsVcfParseFilename(vcfFile);
+	if (bamFiles.size() == 1) mergeBamBarcodes = true;
+	size_t filenum = 0;
 	for (const std::string& bamFile : bamFiles)
 	{
-		auto counts = streamSNPsFromBam(bamFile, refvariants, [&result, &barcodeWhitelist](const SNPMatch& item)
+		std::string filename = parseFilenameNoDirectory(bamFile);
+		auto counts = streamSNPsFromBam(bamFile, refvariants, [&result, &barcodeWhitelist, &filename, mergeBamBarcodes, filenum](const SNPMatch& item)
 		{
 			if (item.chromosome != "23" && lowercase(item.chromosome) != "x" && lowercase(item.chromosome) != "chrx")
 			{
@@ -162,6 +175,7 @@ std::vector<CellMatch> getSNPMatchesFromBamVcf(const std::vector<std::string>& b
 				result.back().cell = item.barcode;
 				result.back().alt = false;
 				result.back().count = item.refFwCount + item.refBwCount;
+				if (!mergeBamBarcodes) result.back().cell = filename + ":" + std::to_string(filenum) + ":" + result.back().cell;
 			}
 			if (item.altFwCount + item.altBwCount > 0)
 			{
@@ -170,10 +184,12 @@ std::vector<CellMatch> getSNPMatchesFromBamVcf(const std::vector<std::string>& b
 				result.back().cell = item.barcode;
 				result.back().alt = true;
 				result.back().count = item.altFwCount + item.altBwCount;
+				if (!mergeBamBarcodes) result.back().cell = filename + ":" + std::to_string(filenum) + ":" + result.back().cell;
 			}
 		});
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << std::get<0>(counts) << " reads" << std::endl;
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << std::get<1>(counts) << " read-variant matches" << std::endl;
+		filenum += 1;
 	}
 	return result;
 }
@@ -182,7 +198,7 @@ std::vector<CellMatch> getSNPMatchesFromBamVcf(const std::string& bamFile, const
 {
 	std::vector<std::string> filenames;
 	filenames.emplace_back(bamFile);
-	return getSNPMatchesFromBamVcf(filenames, vcfFile, barcodeWhitelist);
+	return getSNPMatchesFromBamVcf(filenames, vcfFile, barcodeWhitelist, false);
 }
 
 void sortSNPMatches(std::vector<SNPMatch>& parsed)
