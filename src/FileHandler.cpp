@@ -154,6 +154,25 @@ void writeResultVariants(const EMOutput& result, const bool phasesAreMatPat, std
 	}
 }
 
+void writePseudobulkCellResults(const std::vector<PseudobulkInfo>& pseudobulk, const EMOutput& result, const bool phasesAreMatPat, const std::unordered_map<std::string, std::string>& cellGrouping, const std::string filename)
+{
+	const std::string matName = matHapName(phasesAreMatPat);
+	const std::string patName = patHapName(phasesAreMatPat);
+	std::ofstream file { filename };
+	file << "cell\tgroup\tactive_chrX\tactive_expression\tinactive_expression\tXi" << "\n";
+	for (const auto& t : pseudobulk)
+	{
+		assert(t.patXa == 0);
+		assert(t.patXi == 0);
+		double Xi = (double)(t.matXi) / (double)(t.matXi+t.matXa);
+		if (t.matXi == 0 && t.matXa == 0) Xi = 0;
+		std::string group = "-";
+		if (cellGrouping.count(t.name) == 1) group = cellGrouping.at(t.name);
+		std::string hap = result.result.cellIsMatActive[result.helpers.cellNameToIndex.at(t.name)] ? matName : patName;
+		file << t.name << "\t" << group << "\t" << hap << "\t" << t.matXa << "\t" << t.matXi  << "\t" << Xi << "\n";
+	}
+}
+
 void writePseudobulkResults(const std::vector<PseudobulkInfo>& pseudobulk, const bool phasesAreMatPat, const std::string& firstColumnName, const std::string filename)
 {
 	const std::string matName = matHapName(phasesAreMatPat);

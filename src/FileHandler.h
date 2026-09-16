@@ -13,6 +13,7 @@ std::vector<CellMatch> readMatchCounts(const std::string& matchTableFile);
 void writeResultCellOnlyNonescapeVariants(const EMOutput& result, const bool phasesAreMatPat, std::ostream& stream);
 void writeResultCells(const EMOutput& result, const bool phasesAreMatPat, std::ostream& stream);
 void writeResultVariants(const EMOutput& result, const bool phasesAreMatPat, std::ostream& stream);
+void writePseudobulkCellResults(const std::vector<PseudobulkInfo>& pseudobulk, const EMOutput& result, const bool phasesAreMatPat, const std::unordered_map<std::string, std::string>& cellGrouping, const std::string filename);
 void writePseudobulkResults(const std::vector<PseudobulkInfo>& pseudobulk, const bool phasesAreMatPat, const std::string& firstColumnName, const std::string filename);
 std::pair<std::unordered_map<std::string, bool>, bool> readForcedVariantPhases(const std::string& filename);
 void writeCellMatchCounts(const std::vector<CellMatch>& cellMatches, const std::string& filename);

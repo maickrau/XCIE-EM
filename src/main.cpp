@@ -319,6 +319,11 @@ int main(int argc, char** argv)
 	writePseudobulkResults(pseudobulkVariants2, phasesAreMatPat, "variant", outputPrefix + ".pseudobulk.variants.confidence2.tsv");
 	auto pseudobulkVariants0 = getVariantPseudobulk(output, cellMatches, 0);
 	writePseudobulkResults(pseudobulkVariants0, phasesAreMatPat, "variant", outputPrefix + ".pseudobulk.variants.confidence0.tsv");
+	Logger::Log.log(Logger::LogLevel::DebugInfo) << "write cell pseudobulk results" << std::endl;
+	auto pseudobulkCells2 = getCellPseudobulk(output, cellMatches, 2);
+	writePseudobulkCellResults(pseudobulkCells2, output, phasesAreMatPat, cellGrouping, outputPrefix + ".pseudobulk.cells.confidence2.tsv");
+	auto pseudobulkCells0 = getCellPseudobulk(output, cellMatches, 0);
+	writePseudobulkCellResults(pseudobulkCells0, output, phasesAreMatPat, cellGrouping, outputPrefix + ".pseudobulk.cells.confidence0.tsv");
 	if (cellGrouping.size() > 0)
 	{
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "write variant pseudobulk results per cell group" << std::endl;

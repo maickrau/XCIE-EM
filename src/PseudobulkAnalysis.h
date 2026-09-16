@@ -17,6 +17,7 @@ public:
 	size_t patXi;
 };
 
+std::vector<PseudobulkInfo> getCellPseudobulk(const EMOutput& output, const std::vector<CellMatch>& cellMatches, const double minConfidence);
 std::vector<PseudobulkInfo> getVariantPseudobulk(const EMOutput& output, const std::vector<CellMatch>& cellMatches, const double minConfidence);
 std::vector<PseudobulkInfo> getVariantGroupPseudobulk(const EMOutput& output, const std::vector<CellMatch>& cellMatches, const double minConfidence, const std::unordered_map<std::string, std::string>& cellGrouping);
 std::vector<std::vector<std::pair<std::string, std::string>>> getVariantGeneContainment(const EMOutput& output, const std::vector<std::tuple<size_t, size_t, std::string, std::string>>& geneInfo);

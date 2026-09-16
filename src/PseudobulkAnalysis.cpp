@@ -105,6 +105,52 @@ std::vector<PseudobulkInfo> getVariantGroupPseudobulk(const EMOutput& output, co
 	return result;
 }
 
+std::vector<PseudobulkInfo> getCellPseudobulk(const EMOutput& output, const std::vector<CellMatch>& cellMatches, const double minConfidence)
+{
+	std::unordered_map<size_t, size_t> cellCoverageXa;
+	std::unordered_map<size_t, size_t> cellCoverageXi;
+	const std::vector<bool> includedVariants = getIncludedVariants(output, minConfidence);
+	const std::vector<bool> includedCells = getIncludedCells(output, minConfidence);
+	for (const auto& t : cellMatches)
+	{
+		const size_t variantIndex = output.helpers.variantNameToIndex.at(t.variant);
+		const size_t cellIndex = output.helpers.cellNameToIndex.at(t.cell);
+		if (!includedVariants[variantIndex]) continue;
+		if (!includedCells[cellIndex]) continue;
+		const bool activeCoverage = (output.result.variantIsMatRef[variantIndex] == output.result.cellIsMatActive[cellIndex]) == (!t.alt);
+		if (activeCoverage)
+		{
+			cellCoverageXa[cellIndex] += t.count;
+		}
+		if (!activeCoverage)
+		{
+			cellCoverageXi[cellIndex] += t.count;
+		}
+	}
+	std::vector<std::string> cellOrder = getCellOrder(output.helpers.cellNameToIndex);
+	std::vector<PseudobulkInfo> result;
+	result.reserve(output.helpers.numCells());
+	for (const std::string& name : cellOrder)
+	{
+		const size_t index = output.helpers.cellNameToIndex.at(name);
+		result.emplace_back();
+		result.back().variantIndex = index;
+		result.back().name = name;
+		result.back().matXa = cellCoverageXa[index];
+		result.back().matXi = cellCoverageXi[index];
+		result.back().patXa = 0;
+		result.back().patXi = 0;
+	}
+	for (size_t i = result.size()-1; i < result.size(); i--)
+	{
+		if (includedCells[output.helpers.cellNameToIndex.at(result[i].name)]) continue;
+		std::swap(result[i], result.back());
+		result.pop_back();
+	}
+	std::sort(result.begin(), result.end(), [](const auto& left, const auto& right) { return left.name < right.name; });
+	return result;
+}
+
 std::vector<PseudobulkInfo> getVariantPseudobulk(const EMOutput& output, const std::vector<CellMatch>& cellMatches, const double minConfidence)
 {
 	std::unordered_map<size_t, size_t> variantCoverageMatXa;
