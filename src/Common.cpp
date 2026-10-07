@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <limits>
 #include <regex>
+#include <iomanip>
 #include "Common.h"
 
 std::string matHapName(const bool phasesAreMatPat)
@@ -175,4 +176,11 @@ std::string join(const char separator, const std::vector<std::string>& strings)
 		result += strings[i];
 	}
 	return result;
+}
+
+std::string round(const double value, const int digits)
+{
+	std::ostringstream oss;
+	oss << std::fixed << std::setprecision(digits) << value;
+	return oss.str();
 }

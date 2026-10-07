@@ -22,5 +22,6 @@ void writeGenesPerVariant(const EMOutput& output, const std::vector<std::vector<
 std::unordered_map<std::string, std::string> readCellGrouping(const std::string& filename);
 void writeCellGroupStatistics(const std::vector<CellMatch>& cellMatches, const std::unordered_map<std::string, std::string>& cellGrouping, const std::string& filename);
 std::unordered_set<std::string> readBarcodeWhitelist(const std::string& barcodeWhitelistFile);
+void writeResultsSummary(const std::string filename, const bool phasesAreMatPat, const EMOutput& output);
 
 #endif

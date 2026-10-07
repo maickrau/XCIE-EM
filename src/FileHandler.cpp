@@ -427,3 +427,80 @@ std::unordered_set<std::string> readBarcodeWhitelist(const std::string& barcodeW
 	}
 	return result;
 }
+
+void writeResultsSummary(const std::string filename, const bool phasesAreMatPat, const EMOutput& output)
+{
+	const std::string matName = matHapName(phasesAreMatPat);
+	const std::string patName = patHapName(phasesAreMatPat);
+	std::ofstream file { filename };
+	size_t totalASE = 0;
+	size_t totalCells = output.helpers.numCells();
+	size_t matCells = 0;
+	size_t patCells = 0;
+	size_t unclassifiedCells = 0;
+	size_t totalVariants = output.helpers.numVariants();
+	size_t confidentVariants = 0;
+	for (size_t i = 0; i < output.additions.variantPhaseConfidence.size(); i++)
+	{
+		if (output.additions.variantPhaseConfidence[i] >= 2)
+		{
+			confidentVariants += 1;
+		}
+	}
+	for (size_t i = 0; i < output.helpers.numVariants(); i++)
+	{
+		for (const auto& t : output.helpers.activeCellsPerVariant[i])
+		{
+			totalASE += std::get<1>(t);
+			totalASE += std::get<2>(t);
+		}
+	}
+	for (size_t i = 0; i < output.additions.cellActiveConfidence.size(); i++)
+	{
+		if (output.additions.cellActiveConfidence[i] >= 2)
+		{
+			if (output.result.cellIsMatActive[i])
+			{
+				matCells += 1;
+			}
+			else
+			{
+				patCells += 1;
+			}
+		}
+		else
+		{
+			unclassifiedCells += 1;
+		}
+	}
+	size_t totalXa = 0;
+	size_t totalXi = 0;
+	for (size_t i = 0; i < output.helpers.numCells(); i++)
+	{
+		if (output.additions.cellActiveConfidence[i] < 2) continue;
+		for (auto t : output.helpers.activeVariantsPerCell[i])
+		{
+			if (output.additions.variantPhaseConfidence[std::get<0>(t)] < 2) continue;
+			if (output.result.cellIsMatActive[i] == output.result.variantIsMatRef[std::get<0>(t)])
+			{
+				totalXa += std::get<1>(t);
+				totalXi += std::get<2>(t);
+			}
+			else
+			{
+				totalXa += std::get<2>(t);
+				totalXi += std::get<1>(t);
+			}
+		}
+	}
+	int majorHapSkew = (int)(100.0*((double)std::max(matCells, patCells) / (double)(matCells+patCells))+0.5);
+	file << "Total allele specific expression: " << totalASE << std::endl;
+	file << "Total heterozygously expressed variants: " << totalVariants << std::endl;
+	file << "Confidently phased variants: " << confidentVariants << std::endl;
+	file << "Total cells with allele specific expression: " << totalCells << std::endl;
+	file << "Confidently assigned cells: " << (matCells + patCells) << std::endl;
+	file << "Cells confidently assigned to " << matName << ": " << matCells << std::endl;
+	file << "Cells confidently assigned to " << patName << ": " << patCells << std::endl;
+	file << "Skew: " << majorHapSkew << "/" << (100-majorHapSkew) << std::endl;
+	file << "Average inactive expression over chrX (Xi/(Xi+Xa)): " << round((double)totalXi/(double)(totalXa+totalXi)*100, 2) << "%" << std::endl;
+}

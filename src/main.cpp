@@ -300,13 +300,15 @@ int main(int argc, char** argv)
 	std::tie(forcedPhases, forcedPhasesAreMatPat) = readForcedVariantPhases(forcedPhaseFile);
 	bool phasesAreMatPat = (forcedPhases.size() > 0) && forcedPhasesAreMatPat;
 	EMOutput output = runEM(cellMatches, forcedPhases, randomSeed, initialNoiseMagnitude, noiseDecay, numTries, regionWeights);
+	Logger::Log.log(Logger::LogLevel::DebugInfo) << "write summary results" << std::endl;
+	writeResultsSummary(outputPrefix + ".summary.txt", phasesAreMatPat, output);
 	{
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "write variant results" << std::endl;
 		std::ofstream variantResult { outputPrefix + ".variants.tsv" };
 		writeResultVariants(output, phasesAreMatPat, variantResult);
 	}
-	Logger::Log.log(Logger::LogLevel::DebugInfo) << "write cell results" << std::endl;
 	{
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "write cell results" << std::endl;
 		std::ofstream cellResultWithEscapeVariants { outputPrefix + ".cells.withescapevariants.tsv" };
 		writeResultCells(output, phasesAreMatPat, cellResultWithEscapeVariants);
 	}
