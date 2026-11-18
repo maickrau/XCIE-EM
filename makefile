@@ -21,6 +21,7 @@ OBJ = $(patsubst %, $(ODIR)/%, $(_OBJ))
 VERSION := Git branch $(shell git rev-parse --abbrev-ref HEAD) commit $(shell git rev-parse HEAD) $(shell git show -s --format=%ci)
 
 TEST_SRC = $(wildcard test/*.cpp)
+TEST_DEPS = $(wildcard test/*.h)
 
 $(shell mkdir -p bin)
 $(shell mkdir -p obj)
@@ -36,7 +37,7 @@ $(BINDIR)/CountSNPs: $(DEPS) $(OBJ) $(SRCDIR)/CountSNPs.cpp
 $(ODIR)/%.o: $(SRCDIR)/%.cpp $(DEPS)
 	$(GPP) -c -o $@ $< $(CPPFLAGS)
 
-$(BINDIR)/tests: $(DEPS) $(OBJ) $(TEST_SRC)
+$(BINDIR)/tests: $(DEPS) $(OBJ) $(TEST_SRC) $(TEST_DEPS)
 	$(GPP) -o $@ $(OBJ) $(TEST_SRC) $(LINKFLAGS) -Idoctest/doctest
 
 clean:
