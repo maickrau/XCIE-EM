@@ -341,6 +341,24 @@ TEST_CASE("readForcedVariantPhases reads the last line even without a trailing n
 	CHECK(readForcedVariantPhases(file.path).first.size() == 2);
 }
 
+TEST_CASE("readScReadCountsMatchCounts reads the last line even without a trailing newline" * doctest::should_fail())
+{
+	// BUG: same "getline; if (!good()) break;" pattern as readMatchCounts
+	std::string contents = scReadCountsHeader + scReadCountsLine("X", 100, 'A', 'G', "cell1", 2, 3) + scReadCountsLine("X", 200, 'A', 'G', "cell1", 2, 3);
+	contents.pop_back();
+	TempFile file { ".tsv", contents };
+	CHECK(readScReadCountsMatchCounts(file.path).size() == 4);
+}
+
+TEST_CASE("getGeneInfoFromStream reads the last line even without a trailing newline" * doctest::should_fail())
+{
+	// BUG: same "getline; if (!good()) break;" pattern as readMatchCounts
+	std::string gff = gffLine("chrX", "gene", 1, 20, "ID=g;gene_id=G1;gene_type=protein_coding;gene_name=N1") + gffLine("chrX", "gene", 30, 40, "ID=g;gene_id=G2;gene_type=protein_coding;gene_name=N2");
+	gff.pop_back();
+	std::istringstream stream { gff };
+	CHECK(getGeneInfoFromStream(stream, true).size() == 2);
+}
+
 TEST_CASE("readBarcodeWhitelist")
 {
 	TempFile file { ".txt", "AAA-1\nCCC-1\n\n  GGG-1  \nAAA-1\nTTT-1" };
