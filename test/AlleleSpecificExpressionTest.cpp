@@ -163,4 +163,14 @@ TEST_CASE("filterToValidBarcodes")
 	}
 }
 
+TEST_CASE("hasVariantOverlap")
+{
+	std::vector<CellMatch> matches { makeMatch("c1", "X:5:A:G", false, 1), makeMatch("c2", "X:6:A:G", true, 2) };
+	CHECK(!hasVariantOverlap(matches, {}));
+	CHECK(!hasVariantOverlap({}, { { "X:5:A:G", true } }));
+	CHECK(!hasVariantOverlap(matches, { { "X:7:A:G", true }, { "1:5:A:G", false } }));
+	CHECK(hasVariantOverlap(matches, { { "X:7:A:G", true }, { "X:6:A:G", false } }));
+	CHECK(hasVariantOverlap(matches, { { "X:5:A:G", false } }));
+}
+
 }

@@ -126,6 +126,32 @@ TEST_CASE("round")
 	CHECK(round(12.5, 4) == "12.5000");
 }
 
+TEST_CASE("harmonizeVariantName")
+{
+	CHECK(harmonizeVariantName("X:100:A:G") == "X:100:A:G");
+	CHECK(harmonizeVariantName("chrX:100:A:G") == "X:100:A:G");
+	CHECK(harmonizeVariantName("ChrX:100:A:G") == "X:100:A:G");
+	CHECK(harmonizeVariantName("x:100:A:G") == "X:100:A:G");
+	CHECK(harmonizeVariantName("23:100:A:G") == "X:100:A:G");
+	SUBCASE("other chromosomes are unchanged")
+	{
+		CHECK(harmonizeVariantName("chr1:100:A:G") == "chr1:100:A:G");
+		CHECK(harmonizeVariantName("1:100:A:G") == "1:100:A:G");
+		CHECK(harmonizeVariantName("chrY:100:A:G") == "chrY:100:A:G");
+	}
+	SUBCASE("names which are not in chrom:pos:ref:alt format are unchanged")
+	{
+		CHECK(harmonizeVariantName("chrX:100") == "chrX:100");
+		CHECK(harmonizeVariantName("chrX:100:A:G:extra") == "chrX:100:A:G:extra");
+		CHECK(harmonizeVariantName("") == "");
+		CHECK(harmonizeVariantName("variant") == "variant");
+	}
+	SUBCASE("idempotent")
+	{
+		for (std::string name : { "chrX:1:A:G", "23:5:C:T", "chr2:3:G:A" }) CHECK(harmonizeVariantName(harmonizeVariantName(name)) == harmonizeVariantName(name));
+	}
+}
+
 TEST_CASE("parseVariantPosition")
 {
 	CHECK(parseVariantPosition("X:12345:A:G") == 12345);

@@ -203,6 +203,46 @@ TEST_CASE("readForcedVariantPhases")
 	}
 }
 
+TEST_CASE("readForcedVariantPhases header line and variant name harmonization")
+{
+	SUBCASE("header line is skipped")
+	{
+		TempFile file { ".tsv", "variant\tphase\nX:100:A:G\tmat\n" };
+		auto result = readForcedVariantPhases(file.path);
+		CHECK(result.first.size() == 1);
+		CHECK(result.second == true);
+	}
+	SUBCASE("header line with CRLF is skipped")
+	{
+		TempFile file { ".tsv", "variant\tphase\r\nX:100:A:G\thap1\r\n" };
+		auto result = readForcedVariantPhases(file.path);
+		REQUIRE(result.first.size() == 1);
+		CHECK(result.first.at("X:100:A:G") == true);
+	}
+	SUBCASE("header is only allowed on the first line")
+	{
+		TempFile file { ".tsv", "X:100:A:G\tmat\nvariant\tphase\n" };
+		CHECK(abortsInChild([&]() { readForcedVariantPhases(file.path); }));
+	}
+	SUBCASE("chromosome names are harmonized")
+	{
+		TempFile file { ".tsv", "chrX:100:A:G\tpat\n23:200:C:T\tmat\n" };
+		auto result = readForcedVariantPhases(file.path);
+		REQUIRE(result.first.size() == 2);
+		CHECK(result.first.at("X:100:A:G") == false);
+		CHECK(result.first.at("X:200:C:T") == true);
+	}
+}
+
+TEST_CASE("readMatchCounts harmonizes variant names")
+{
+	TempFile file { ".tsv", "cell1\tchrX:100:A:G\tREF\t5\r\ncell1\t23:200:C:T\tALT\t3\r\n" };
+	auto matches = readMatchCounts(file.path);
+	REQUIRE(matches.size() == 2);
+	CHECK(sameMatch(matches[0], makeMatch("cell1", "X:100:A:G", false, 5)));
+	CHECK(sameMatch(matches[1], makeMatch("cell1", "X:200:C:T", true, 3)));
+}
+
 TEST_CASE("readForcedVariantPhases aborts on invalid input")
 {
 	TempFile mixed1 { ".tsv", "X:100:A:G\tmat\nX:200:C:T\thap1\n" };
