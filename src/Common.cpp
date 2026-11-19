@@ -1,3 +1,4 @@
+#include <cassert>
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -183,4 +184,14 @@ std::string round(const double value, const int digits)
 	std::ostringstream oss;
 	oss << std::fixed << std::setprecision(digits) << value;
 	return oss.str();
+}
+
+std::string harmonizeVariantName(const std::string& raw)
+{
+	auto parts = split(raw, ':');
+	if (parts.size() == 4 && (parts[0] == "23" || lowercase(parts[0]) == "x" || lowercase(parts[0]) == "chrx"))
+	{
+		parts[0] = "X";
+	}
+	return join(':', parts);
 }

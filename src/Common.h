@@ -19,5 +19,6 @@ double getBinomialPValueGreaterThan(const double p, const size_t successes, cons
 double getBinomialPValueLessThan(const double p, const size_t successes, const size_t trials);
 bool hasExtension(const std::string& filename, const std::string& extension);
 std::string round(const double value, const int digits);
+std::string harmonizeVariantName(const std::string& raw);
 
 #endif

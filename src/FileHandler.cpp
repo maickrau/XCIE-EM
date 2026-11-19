@@ -34,6 +34,7 @@ std::vector<CellMatch> readScReadCountsMatchCounts(const std::string& scReadCoun
 	{
 		std::string line;
 		std::getline(file, line);
+		if (line.size() > 0 && line.back() == '\r') line.pop_back();
 		if (line.size() == 0) continue;
 		parts = split(line, '\t');
 		if (parts.size() != 14)
@@ -46,6 +47,7 @@ std::vector<CellMatch> readScReadCountsMatchCounts(const std::string& scReadCoun
 			continue;
 		}
 		std::string variantName = parts[0] + ":" + parts[1] + ":" + parts[2] + ":" + parts[3];
+		variantName = harmonizeVariantName(variantName);
 		std::string barcode = parts[4];
 		size_t refMatch = std::stoull(parts[10]);
 		size_t altMatch = std::stoull(parts[9]);
@@ -88,7 +90,7 @@ std::vector<CellMatch> readMatchCounts(const std::string& matchTableFile)
 		}
 		CellMatch match;
 		match.cell = parts[0];
-		match.variant = parts[1];
+		match.variant = harmonizeVariantName(parts[1]);
 		match.count = std::stoull(parts[3]);
 		if (parts[2] == "ALT")
 		{
@@ -210,6 +212,7 @@ std::pair<std::unordered_map<std::string, bool>, bool> readForcedVariantPhases(c
 		std::string variant;
 		std::string origin;
 		sstr >> variant >> origin;
+		variant = harmonizeVariantName(variant);
 		totalForcedVariants += 1;
 		if (origin == "hap1" || origin == "mat")
 		{

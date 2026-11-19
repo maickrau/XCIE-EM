@@ -258,6 +258,10 @@ int main(int argc, char** argv)
 		std::string matchTableFile = params["input-preprocessed-table"].as<std::string>();
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "read preprocessed counts from file " << matchTableFile << std::endl;
 		cellMatches = readMatchCounts(matchTableFile);
+		if (barcodeWhitelist.size() > 0) cellMatches = filterToValidBarcodes(cellMatches, barcodeWhitelist);
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << cellMatches.size() << " count items" << std::endl;
+		Logger::Log.log(Logger::LogLevel::DebugInfo) << "filter out homozygous sites" << std::endl;
+		cellMatches = filterOutHomozygousSites(cellMatches);
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << cellMatches.size() << " count items" << std::endl;
 	}
 	if (params.count("input-screadcounts") > 0)
@@ -265,6 +269,7 @@ int main(int argc, char** argv)
 		std::string scReadCountsFile = params["input-screadcounts"].as<std::string>();
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "read screadcounts from file " << scReadCountsFile << std::endl;
 		cellMatches = readScReadCountsMatchCounts(scReadCountsFile);
+		if (barcodeWhitelist.size() > 0) cellMatches = filterToValidBarcodes(cellMatches, barcodeWhitelist);
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << cellMatches.size() << " count items" << std::endl;
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "filter out homozygous sites" << std::endl;
 		cellMatches = filterOutHomozygousSites(cellMatches);
@@ -288,10 +293,6 @@ int main(int argc, char** argv)
 			Logger::Log.log(Logger::LogLevel::Always) << " " << std::get<0>(t) << "-" << std::get<1>(t) << " " << std::get<2>(t);
 		}
 		Logger::Log.log(Logger::LogLevel::Always) << std::endl;
-	}
-	if (barcodeWhitelist.size() > 0)
-	{
-		cellMatches = filterToValidBarcodes(cellMatches, barcodeWhitelist);
 	}
 	writeCellMatchCounts(cellMatches, outputPrefix + ".preprocessed_matches.tsv");
 	if (cellGrouping.size() > 0)
@@ -349,7 +350,7 @@ int main(int argc, char** argv)
 		auto genePseudobulk2 = getGenePseudobulk(pseudobulkVariants2, variantPerGene);
 		writePseudobulkResults(genePseudobulk2, phasesAreMatPat, "gene_id\tgene_name", outputPrefix + ".pseudobulk.genes.confidence2.tsv");
 		auto genePseudobulk0 = getGenePseudobulk(pseudobulkVariants0, variantPerGene);
-		writePseudobulkResults(genePseudobulk2, phasesAreMatPat, "gene_id\tgene_name", outputPrefix + ".pseudobulk.genes.confidence0.tsv");
+		writePseudobulkResults(genePseudobulk0, phasesAreMatPat, "gene_id\tgene_name", outputPrefix + ".pseudobulk.genes.confidence0.tsv");
 		if (cellGrouping.size() > 0)
 		{
 			Logger::Log.log(Logger::LogLevel::DebugInfo) << "write gene pseudobulk results per cell group" << std::endl;

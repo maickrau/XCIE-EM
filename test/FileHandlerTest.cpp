@@ -38,6 +38,16 @@ std::string gffLine(const std::string& chrom, const std::string& type, size_t st
 TEST_SUITE("FileHandler")
 {
 
+TEST_CASE("readMatchCounts harmonizes chrX name")
+{
+	TempFile file { ".tsv", "cell1\tchrX:100:A:G\tREF\t5\ncell2\tX:200:C:T\tALT\t3\n\ncell1\t23:200:C:T\tREF\t1\n" };
+	auto matches = readMatchCounts(file.path);
+	REQUIRE(matches.size() == 3);
+	CHECK(sameMatch(matches[0], makeMatch("cell1", "X:100:A:G", false, 5)));
+	CHECK(sameMatch(matches[1], makeMatch("cell2", "X:200:C:T", true, 3)));
+	CHECK(sameMatch(matches[2], makeMatch("cell1", "X:200:C:T", false, 1)));
+}
+
 TEST_CASE("readMatchCounts parses the preprocessed table")
 {
 	TempFile file { ".tsv", "cell1\tX:100:A:G\tREF\t5\ncell2\tX:200:C:T\tALT\t3\n\ncell1\tX:200:C:T\tREF\t1\n" };
@@ -110,7 +120,7 @@ TEST_CASE("readScReadCountsMatchCounts")
 	CHECK(matches[2].alt == false);
 	CHECK(matches[2].count == 4);
 	CHECK(parseVariantPosition(matches[2].variant) == 200);
-	CHECK(sameMatch(matches[3], makeMatch("cell3", "23:300:G:A", true, 6)));
+	CHECK(sameMatch(matches[3], makeMatch("cell3", "X:300:G:A", true, 6)));
 	CHECK(matches[4].alt == false);
 	CHECK(matches[4].count == 1);
 	CHECK(matches[5].alt == true);
@@ -120,12 +130,8 @@ TEST_CASE("readScReadCountsMatchCounts")
 	CHECK(parseVariantPosition(matches[6].variant) == 500);
 }
 
-TEST_CASE("readScReadCountsMatchCounts names chrX variants like the BAM input and the forced phase format" * doctest::should_fail())
+TEST_CASE("readScReadCountsMatchCounts names chrX variants like the BAM input and the forced phase format")
 {
-	// BUG: the variant name is built from the raw CHROM column, so scReadCounts input with
-	// CHROM "chrX" gives names like "chrX:200:C:T". The BAM input strips "chr" ("X:200:C:T"),
-	// and the README specifies "X:(position):(ref):(alt)" for --force-phase. With chrX-named
-	// scReadCounts input every trio-phased variant is silently ignored.
 	std::string contents = scReadCountsHeader;
 	contents += scReadCountsLine("chrX", 200, 'C', 'T', "cell2", 1, 4);
 	contents += scReadCountsLine("ChrX", 300, 'C', 'T', "cell2", 1, 4);

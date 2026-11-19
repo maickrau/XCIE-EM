@@ -172,6 +172,7 @@ std::vector<CellMatch> getSNPMatchesFromBamVcf(const std::vector<std::string>& b
 			{
 				result.emplace_back();
 				result.back().variant = item.chromosome + ":" + std::to_string(item.position) + ":" + item.ref + ":" + item.alt;
+				result.back().variant = harmonizeVariantName(result.back().variant);
 				result.back().cell = item.barcode;
 				result.back().alt = false;
 				result.back().count = item.refFwCount + item.refBwCount;
@@ -181,6 +182,7 @@ std::vector<CellMatch> getSNPMatchesFromBamVcf(const std::vector<std::string>& b
 			{
 				result.emplace_back();
 				result.back().variant = item.chromosome + ":" + std::to_string(item.position) + ":" + item.ref + ":" + item.alt;
+				result.back().variant = harmonizeVariantName(result.back().variant);
 				result.back().cell = item.barcode;
 				result.back().alt = true;
 				result.back().count = item.altFwCount + item.altBwCount;
