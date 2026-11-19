@@ -65,3 +65,12 @@ std::vector<CellMatch> filterToValidBarcodes(const std::vector<CellMatch>& raw, 
 	}
 	return result;
 }
+
+bool hasVariantOverlap(const std::vector<CellMatch>& cellMatches, const std::unordered_map<std::string, bool>& forcedPhases)
+{
+	for (const auto& t : cellMatches)
+	{
+		if (forcedPhases.count(t.variant) == 1) return true;
+	}
+	return false;
+}

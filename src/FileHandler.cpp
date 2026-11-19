@@ -205,16 +205,22 @@ std::pair<std::unordered_map<std::string, bool>, bool> readForcedVariantPhases(c
 	if (filename == "") return std::make_pair(forcedVariants, forcedPhasesAreMatPat);
 	std::ifstream file { filename };
 	size_t totalForcedVariants = 0;
+	size_t lineNum = 0;
 	while (file.good())
 	{
 		std::string line;
 		getline(file, line);
+		lineNum += 1;
 		if (line.size() > 0 && line.back() == '\r') line.pop_back();
 		if (line.size() < 3) continue;
 		std::stringstream sstr { line };
 		std::string variant;
 		std::string origin;
 		sstr >> variant >> origin;
+		if (lineNum == 1)
+		{
+			if (variant == "variant" && origin == "phase") continue;
+		}
 		variant = harmonizeVariantName(variant);
 		totalForcedVariants += 1;
 		if (origin == "hap1" || origin == "mat")

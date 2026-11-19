@@ -304,7 +304,7 @@ int main(int argc, char** argv)
 	std::unordered_map<std::string, bool> forcedPhases;
 	bool forcedPhasesAreMatPat;
 	std::tie(forcedPhases, forcedPhasesAreMatPat) = readForcedVariantPhases(forcedPhaseFile);
-	bool phasesAreMatPat = (forcedPhases.size() > 0) && forcedPhasesAreMatPat;
+	bool phasesAreMatPat = (forcedPhases.size() > 0) && forcedPhasesAreMatPat && hasVariantOverlap(cellMatches, forcedPhases);
 	EMOutput output = runEM(cellMatches, forcedPhases, randomSeed, initialNoiseMagnitude, noiseDecay, numTries, regionWeights);
 	Logger::Log.log(Logger::LogLevel::DebugInfo) << "write summary results" << std::endl;
 	writeResultsSummary(outputPrefix + ".summary.txt", phasesAreMatPat, output);
