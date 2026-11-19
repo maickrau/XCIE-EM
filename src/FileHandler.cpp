@@ -18,6 +18,7 @@ std::vector<CellMatch> readScReadCountsMatchCounts(const std::string& scReadCoun
 	}
 	std::string header;
 	std::getline(file, header);
+	if (header.size() > 0 && header.back() == '\r') header.pop_back();
 	if (!file.good())
 	{
 		std::cerr << "Input scReadCounts file can't be read!" << std::endl;
@@ -81,6 +82,7 @@ std::vector<CellMatch> readMatchCounts(const std::string& matchTableFile)
 	{
 		std::string line;
 		getline(file, line);
+		if (line.size() > 0 && line.back() == '\r') line.pop_back();
 		if (line.size() == 0) continue;
 		auto parts = split(line, '\t');
 		if (parts.size() != 4 || (parts[2] != "REF" && parts[2] != "ALT"))
@@ -207,6 +209,7 @@ std::pair<std::unordered_map<std::string, bool>, bool> readForcedVariantPhases(c
 	{
 		std::string line;
 		getline(file, line);
+		if (line.size() > 0 && line.back() == '\r') line.pop_back();
 		if (line.size() < 3) continue;
 		std::stringstream sstr { line };
 		std::string variant;
@@ -281,6 +284,7 @@ std::vector<std::tuple<size_t, size_t, std::string, std::string>> getGeneInfoFro
 	{
 		std::string line;
 		std::getline(stream, line);
+		if (line.size() > 0 && line.back() == '\r') line.pop_back();
 		if (line.size() < 10) continue;
 		if (line[0] == '#') continue;
 		auto parts = split(line, '\t');
@@ -356,6 +360,7 @@ std::unordered_map<std::string, std::string> readCellGrouping(const std::string&
 	{
 		std::string header;
 		std::getline(file, header);
+		if (header.size() > 0 && header.back() == '\r') header.pop_back();
 		auto parts = split(header, '\t');
 		if (parts.size() != 2 || (lowercase(parts[0]) != "barcode" && lowercase(parts[0]) != "cell"))
 		{
@@ -367,6 +372,7 @@ std::unordered_map<std::string, std::string> readCellGrouping(const std::string&
 	{
 		std::string line;
 		std::getline(file, line);
+		if (line.size() > 0 && line.back() == '\r') line.pop_back();
 		if (line.size() == 0) continue;
 		auto parts = split(line, '\t');
 		if (parts.size() != 2) continue;

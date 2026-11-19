@@ -376,19 +376,16 @@ TEST_CASE("getGeneInfoFromStream reads the last line even without a trailing new
 	CHECK(getGeneInfoFromStream(stream, true).size() == 2);
 }
 
-TEST_CASE("readCellGrouping handles Windows line endings" * doctest::should_fail())
+TEST_CASE("readCellGrouping handles Windows line endings")
 {
-	// BUG (minor): no reader strips '\r', so a cell group file saved with CRLF line endings
-	// gives group names like "Tcell\r", which then end up inside the output tables.
 	TempFile file { ".tsv", "barcode\tgroup\r\nAAA\tTcell\r\n" };
 	auto grouping = readCellGrouping(file.path);
 	REQUIRE(grouping.count("AAA") == 1);
 	CHECK(grouping.at("AAA") == "Tcell");
 }
 
-TEST_CASE("getGeneInfoFromStream handles Windows line endings" * doctest::should_fail())
+TEST_CASE("getGeneInfoFromStream handles Windows line endings")
 {
-	// BUG (minor): the last GFF3 attribute keeps the '\r', eg gene_name "GENE1\r"
 	std::istringstream stream { "chrX\tHAVANA\tgene\t1\t20\t.\t+\t.\tgene_id=G1;gene_type=protein_coding;gene_name=GENE1\r\n" };
 	auto genes = getGeneInfoFromStream(stream, true);
 	REQUIRE(genes.size() == 1);
