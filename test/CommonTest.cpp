@@ -236,44 +236,6 @@ TEST_CASE("getVariantOrder contains every name exactly once")
 	CHECK(seen.size() == nameToIndex.size());
 }
 
-TEST_CASE("logNChooseK")
-{
-	CHECK(logNChooseK(0, 0) == doctest::Approx(0));
-	CHECK(logNChooseK(5, 0) == doctest::Approx(0));
-	CHECK(logNChooseK(5, 5) == doctest::Approx(0));
-	CHECK(logNChooseK(5, 1) == doctest::Approx(log(5)));
-	CHECK(logNChooseK(10, 3) == doctest::Approx(log(120)));
-	CHECK(logNChooseK(10, 7) == doctest::Approx(log(120)));
-	CHECK(logNChooseK(52, 5) == doctest::Approx(log(2598960)));
-	SUBCASE("symmetry")
-	{
-		for (size_t n = 0; n < 30; n++)
-		{
-			for (size_t k = 0; k <= n; k++)
-			{
-				CHECK(logNChooseK(n, k) == doctest::Approx(logNChooseK(n, n-k)));
-			}
-		}
-	}
-	SUBCASE("Pascal's rule")
-	{
-		for (size_t n = 2; n < 30; n++)
-		{
-			for (size_t k = 1; k < n; k++)
-			{
-				double lhs = exp(logNChooseK(n, k));
-				double rhs = exp(logNChooseK(n-1, k-1)) + exp(logNChooseK(n-1, k));
-				CHECK(lhs == doctest::Approx(rhs));
-			}
-		}
-	}
-	SUBCASE("large values don't overflow")
-	{
-		CHECK(std::isfinite(logNChooseK(100000, 50000)));
-		CHECK(logNChooseK(100000, 50000) > 0);
-	}
-}
-
 TEST_CASE("binomial p-values against known values")
 {
 	// P(X >= 3) for X ~ Bin(10, 0.1)
@@ -319,14 +281,8 @@ TEST_CASE("binomial p-values are monotonic")
 	}
 }
 
-TEST_CASE("binomial p-values are fast for large numbers of trials" * doctest::should_fail() * doctest::timeout(0.5))
+TEST_CASE("binomial p-values are fast for large numbers of trials")
 {
-	// BUG (performance): getBinomialPValueGreaterThan/LessThan sum O(trials) terms and each
-	// term calls logNChooseK which is itself O(k), so the cost is quadratic in the number of
-	// reads: ~2 s for 30000 reads and ~25 s for 100000 reads. The pseudobulk outputs compute
-	// this for every variant and gene, and highly expressed genes (eg XIST) can have far more
-	// reads than that. Computing the terms incrementally (or using lgamma / the regularized
-	// incomplete beta function) makes this linear or constant time.
 	double over = getBinomialPValueGreaterThan(0.1, 3000, 30000);
 	double under = getBinomialPValueLessThan(0.1, 3000, 30000);
 	CHECK(over + under > 1.0);

@@ -15,9 +15,6 @@
 #include "../src/AlleleSpecificExpression.h"
 #include "../src/PseudobulkAnalysis.h"
 
-// Common.cpp
-double logNChooseK(const size_t n, const size_t k);
-
 // FileHandler.cpp
 std::unordered_map<std::string, std::string> parseTagsGff3(const std::string& tagstr);
 std::vector<std::tuple<size_t, size_t, std::string, std::string>> getGeneInfoFromStream(std::istream& stream, const bool onlyProteinCoding);
