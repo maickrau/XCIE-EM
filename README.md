@@ -34,7 +34,7 @@ Alternatively you can use [scReadCounts](https://horvathlab.github.io/NGS/SCRead
 XCIE-EM --input-screadcounts screadcounts.output.tsv --output-prefix EM_output --defaults-grch38 --annotation-gff3 gene_annotation_file.gff3
 ```
 
-The parameter `--defaults-grch38` are not mandatory but they improve the results by downweighting the PAR and flipping XIST phase. For other references you can also use `--defaults-grch37` or `--defaults-chm13` or manually with `--XIST-region` and `--PAR-region`.
+The parameter `--defaults-grch38` is not mandatory but it improves the results by downweighting the PAR and flipping XIST phase. For other references you can also use `--defaults-grch37` or `--defaults-chm13`, or manually with `--XIST-region` and `--PAR-region`.
 
 ### Using trio data
 
