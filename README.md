@@ -23,7 +23,7 @@ make all
 First align the single cell reads to your reference and call variants. Make sure that the cell barcodes are in the BAM tags `CB:Z:`. Then run:
 
 ```
-XCIE-EM --input-bam sorted_alignments.bam --input-vcf sample_variants.vcf --output-prefix EM_output --exclude-PAR --exclude-XIST-grch38 --annotation-gff3 gene_annotation_file.gff3
+XCIE-EM --input-bam sorted_alignments.bam --input-vcf sample_variants.vcf --output-prefix EM_output --defaults-grch38 --annotation-gff3 gene_annotation_file.gff3
 ```
 
 This will count ref/alt coverage per heterozygous variant per cell, and then estimate the variant phases and cell activities. The output is written to files which start with `EM_output`. See the section [output](#output) for explanations of all the output files.
@@ -31,10 +31,10 @@ This will count ref/alt coverage per heterozygous variant per cell, and then est
 Alternatively you can use [scReadCounts](https://horvathlab.github.io/NGS/SCReadCounts/) to count the expression per heterozygous SNP per cell and then run:
 
 ```
-XCIE-EM --input-screadcounts screadcounts.output.tsv --output-prefix EM_output --exclude-PAR --exclude-XIST-grch38 --annotation-gff3 gene_annotation_file.gff3
+XCIE-EM --input-screadcounts screadcounts.output.tsv --output-prefix EM_output --defaults-grch38 --annotation-gff3 gene_annotation_file.gff3
 ```
 
-The parameters `--exclude-PAR` `--exclude-XIST-grch38` are not mandatory but they improve the results by removing the PAR and XIST regions, which are difficult to phase from chrX inactivation. For other references you can also use `--exclude-XIST-grch37` or `--exclude-XIST-chm13` or manually with `--exclude-region`.
+The parameter `--defaults-grch38` are not mandatory but they improve the results by downweighting the PAR and flipping XIST phase. For other references you can also use `--defaults-grch37` or `--defaults-chm13` or manually with `--XIST-region` and `--PAR-region`.
 
 ### Using trio data
 
@@ -77,12 +77,14 @@ The pseudobulk variant and gene files have columns `pvalue_Xiover10_unadjusted` 
 - `--input-screadcounts`: Take the counts from scReadCounts as input. Recommended.
 - `--input-preprocessed-table`: Take the counts from a preprocessed table.
 - `-o, --output-prefix`: Output prefix.
+- `--defaults-grch38 --defaults-grch37 --defaults-chm13`: Use default region weighting for GRCh38/GRCh37/CHM13 reference. Recommended. Pick the option based on which reference the reads were aligned to.
 - `--force-phase`: Use variant phasing from trio data to force the phase for some variants. This will also help guide the phasing of other variants.
 - `--annotation-gff3`: A gff3 annotation file. Used for counting pseudobulk expression per gene.
+- `--exclude-region`: Exclude some regions. All variants inside the excluded regions are ignored.
+- `--XIST-region`: Mark a region as XIST, which will assume that inactive chrX is higher expressed than the active chrX inside the XIST region.
+- `--PAR-region`: Mark a region as PAR, which will assume that inactive chrX expression is high and so phasing is less reliable.
+- `--exclude-PAR`: Exclude the PAR region.
 - `--EM-noise-magnitude`: Noise added to the EM algorithm to avoid local minima. Default 20 usually works well.
 - `--EM-noise-decay`: Decay speed of noise in EM algorithm. Default 0.95 usually works well.
 - `--EM-random-seed`: Random seed used for EM initialization.
 - `--EM-num-runs`: Number of initializations used for EM. The best result is picked out of all runs.
-- `--exclude-regions`: Exclude some regions. The reason to exclude regions is that some regions (eg XIST) have higher expression from the inactive chrX, which violates the fundamental assumptions used in the EM algorithm.
-- `--exclude-PAR`: Exclude the PAR region. Recommended since the PAR region usually has low phasing accuracy.
-- `--exclude-XIST-grch38 --exclude-XIST-grch37 --exclude-XIST-chm13`: Exclude the XIST and TSIX genes. Recommended since XIST has higher expression from the inactive chrX. You should pick the correct one based on your reference.
