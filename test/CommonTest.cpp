@@ -171,12 +171,8 @@ TEST_CASE("parseBedRegion valid regions")
 	}
 }
 
-TEST_CASE("parseBedRegion returns the full chromosome name" * doctest::should_fail())
+TEST_CASE("parseBedRegion returns the full chromosome name")
 {
-	// BUG: the regex in parseBedRegion is "^([chrCHR0123456789XYMxymt])+:..." where the
-	// repetition is outside the capture group, so the capture only contains the LAST
-	// character of the chromosome name. "chrX" becomes "X" (which happens to work),
-	// but "23" becomes "3" and "chr10" becomes "0".
 	CHECK(std::get<0>(parseBedRegion("chrX:100-200")) == "chrX");
 	CHECK(std::get<0>(parseBedRegion("23:100-200")) == "23");
 	CHECK(std::get<0>(parseBedRegion("chr10:100-200")) == "chr10");

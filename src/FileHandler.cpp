@@ -34,8 +34,13 @@ std::vector<CellMatch> readScReadCountsMatchCounts(const std::string& scReadCoun
 	{
 		std::string line;
 		std::getline(file, line);
-		if (!file.good()) break;
+		if (line.size() == 0) continue;
 		parts = split(line, '\t');
+		if (parts.size() != 14)
+		{
+			std::cerr << "Input scReadCounts file format is wrong. Double check that you are using the sparse matrix tsv file (output.tsv) and not the dense matrix file (output.cnt.matrix.tsv or output.vaf-m1.matrix.tsv)" << std::endl;
+			std::abort();
+		}
 		if (parts[0] != "23" && lowercase(parts[0]) != "x" && lowercase(parts[0]) != "chrx")
 		{
 			continue;
@@ -74,7 +79,6 @@ std::vector<CellMatch> readMatchCounts(const std::string& matchTableFile)
 	{
 		std::string line;
 		getline(file, line);
-		if (!file.good()) break;
 		if (line.size() == 0) continue;
 		auto parts = split(line, '\t');
 		if (parts.size() != 4 || (parts[2] != "REF" && parts[2] != "ALT"))
@@ -201,7 +205,6 @@ std::pair<std::unordered_map<std::string, bool>, bool> readForcedVariantPhases(c
 	{
 		std::string line;
 		getline(file, line);
-		if (!file.good()) break;
 		if (line.size() < 3) continue;
 		std::stringstream sstr { line };
 		std::string variant;
@@ -275,7 +278,6 @@ std::vector<std::tuple<size_t, size_t, std::string, std::string>> getGeneInfoFro
 	{
 		std::string line;
 		std::getline(stream, line);
-		if (!stream.good()) break;
 		if (line.size() < 10) continue;
 		if (line[0] == '#') continue;
 		auto parts = split(line, '\t');
@@ -289,7 +291,7 @@ std::vector<std::tuple<size_t, size_t, std::string, std::string>> getGeneInfoFro
 			if (tags.count("gene_type") == 0 || tags.at("gene_type") != "protein_coding") continue;
 		}
 		std::string geneId = tags.count("gene_id") == 1 ? tags.at("gene_id") : "";
-		std::string geneName = tags.count("gene_id") == 1 ? tags.at("gene_name") : "";
+		std::string geneName = tags.count("gene_name") == 1 ? tags.at("gene_name") : "";
 		size_t startPos = std::stoull(parts[3]);
 		size_t endPos = std::stoull(parts[4]);
 		if (geneName == "") geneName = geneId;
@@ -362,8 +364,9 @@ std::unordered_map<std::string, std::string> readCellGrouping(const std::string&
 	{
 		std::string line;
 		std::getline(file, line);
-		if (!file.good()) break;
+		if (line.size() == 0) continue;
 		auto parts = split(line, '\t');
+		if (parts.size() != 2) continue;
 		if (result.count(parts[0]) == 1)
 		{
 			std::cerr << "Cell group file has duplicates. Duplicate barcode: " << parts[0] << std::endl;
@@ -493,7 +496,16 @@ void writeResultsSummary(const std::string filename, const bool phasesAreMatPat,
 			}
 		}
 	}
-	int majorHapSkew = (int)(100.0*((double)std::max(matCells, patCells) / (double)(matCells+patCells))+0.5);
+	int majorHapSkew = 0;
+	if (matCells + patCells > 0)
+	{
+		majorHapSkew = (int)(100.0*((double)std::max(matCells, patCells) / (double)(matCells+patCells))+0.5);
+	}
+	double XiFraction = 0;
+	if (totalXa + totalXi > 0)
+	{
+		XiFraction = (double)totalXi/(double)(totalXa+totalXi)*100;
+	}
 	file << "Total allele specific expression: " << totalASE << std::endl;
 	file << "Total heterozygously expressed variants: " << totalVariants << std::endl;
 	file << "Confidently phased variants: " << confidentVariants << std::endl;
@@ -502,5 +514,5 @@ void writeResultsSummary(const std::string filename, const bool phasesAreMatPat,
 	file << "Cells confidently assigned to " << matName << ": " << matCells << std::endl;
 	file << "Cells confidently assigned to " << patName << ": " << patCells << std::endl;
 	file << "Skew: " << majorHapSkew << "/" << (100-majorHapSkew) << std::endl;
-	file << "Average inactive expression over chrX (Xi/(Xi+Xa)): " << round((double)totalXi/(double)(totalXa+totalXi)*100, 2) << "%" << std::endl;
+	file << "Average inactive expression over chrX (Xi/(Xi+Xa)): " << round(XiFraction, 2) << "%" << std::endl;
 }

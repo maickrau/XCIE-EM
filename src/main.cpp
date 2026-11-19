@@ -143,6 +143,11 @@ int main(int argc, char** argv)
 			}
 		}
 	}
+	if (params.count("EM-num-runs") == 1 && params["EM-num-runs"].as<size_t>() == 0)
+	{
+		std::cerr << "--EM-num-runs must be at least one" << std::endl;
+		paramError = true;
+	}
 	if (paramError)
 	{
 		std::abort();

@@ -65,12 +65,8 @@ TEST_CASE("readMatchCounts aborts on malformed input")
 	CHECK(abortsInChild([&]() { readMatchCounts(extraColumn.path); }));
 }
 
-TEST_CASE("readMatchCounts reads the last line even without a trailing newline" * doctest::should_fail())
+TEST_CASE("readMatchCounts reads the last line even without a trailing newline")
 {
-	// BUG: the read loop is "getline(file, line); if (!file.good()) break;". When the last line
-	// has no trailing newline, getline sets eofbit while still reading the line, so the
-	// last record is silently dropped. Same pattern in readScReadCountsMatchCounts,
-	// readForcedVariantPhases, getGeneInfoFromStream and readCellGrouping.
 	TempFile file { ".tsv", "cell1\tX:100:A:G\tREF\t5\ncell2\tX:200:C:T\tALT\t3" };
 	CHECK(readMatchCounts(file.path).size() == 2);
 }
@@ -252,13 +248,8 @@ TEST_CASE("getGeneInfoFromStream")
 	}
 }
 
-TEST_CASE("getGeneInfoFromStream handles a missing gene_name" * doctest::should_fail())
+TEST_CASE("getGeneInfoFromStream handles a missing gene_name")
 {
-	// BUG: in getGeneInfoFromStream the gene name is read with
-	//   tags.count("gene_id") == 1 ? tags.at("gene_name") : ""
-	// i.e. it checks for gene_id but reads gene_name. A gene with gene_id but no gene_name
-	// throws std::out_of_range (crashing the program) instead of falling back to the gene id,
-	// and a gene with gene_name but no gene_id loses its name.
 	std::istringstream stream1 { gffLine("chrX", "gene", 1, 20, "ID=g;gene_id=G;gene_type=protein_coding") };
 	std::vector<std::tuple<size_t, size_t, std::string, std::string>> genes;
 	CHECK_NOTHROW(genes = getGeneInfoFromStream(stream1, true));
@@ -327,32 +318,28 @@ TEST_CASE("readCellGrouping")
 	}
 }
 
-TEST_CASE("readCellGrouping reads the last line even without a trailing newline" * doctest::should_fail())
+TEST_CASE("readCellGrouping reads the last line even without a trailing newline")
 {
-	// BUG: same "getline; if (!good()) break;" pattern as readMatchCounts
 	TempFile file { ".tsv", "barcode\tgroup\nAAA\tTcell\nCCC\tBcell" };
 	CHECK(readCellGrouping(file.path).size() == 2);
 }
 
-TEST_CASE("readForcedVariantPhases reads the last line even without a trailing newline" * doctest::should_fail())
+TEST_CASE("readForcedVariantPhases reads the last line even without a trailing newline")
 {
-	// BUG: same "getline; if (!good()) break;" pattern as readMatchCounts
 	TempFile file { ".tsv", "X:100:A:G\tmat\nX:200:C:T\tpat" };
 	CHECK(readForcedVariantPhases(file.path).first.size() == 2);
 }
 
-TEST_CASE("readScReadCountsMatchCounts reads the last line even without a trailing newline" * doctest::should_fail())
+TEST_CASE("readScReadCountsMatchCounts reads the last line even without a trailing newline")
 {
-	// BUG: same "getline; if (!good()) break;" pattern as readMatchCounts
 	std::string contents = scReadCountsHeader + scReadCountsLine("X", 100, 'A', 'G', "cell1", 2, 3) + scReadCountsLine("X", 200, 'A', 'G', "cell1", 2, 3);
 	contents.pop_back();
 	TempFile file { ".tsv", contents };
 	CHECK(readScReadCountsMatchCounts(file.path).size() == 4);
 }
 
-TEST_CASE("getGeneInfoFromStream reads the last line even without a trailing newline" * doctest::should_fail())
+TEST_CASE("getGeneInfoFromStream reads the last line even without a trailing newline")
 {
-	// BUG: same "getline; if (!good()) break;" pattern as readMatchCounts
 	std::string gff = gffLine("chrX", "gene", 1, 20, "ID=g;gene_id=G1;gene_type=protein_coding;gene_name=N1") + gffLine("chrX", "gene", 30, 40, "ID=g;gene_id=G2;gene_type=protein_coding;gene_name=N2");
 	gff.pop_back();
 	std::istringstream stream { gff };
@@ -579,11 +566,8 @@ TEST_CASE("writeResultsSummary")
 	}
 }
 
-TEST_CASE("writeResultsSummary when no cells are confidently assigned" * doctest::should_fail())
+TEST_CASE("writeResultsSummary when no cells are confidently assigned")
 {
-	// BUG: with zero confidently assigned cells, the skew is computed as
-	// (int)(100.0 * 0/0 + 0.5) which is a NaN-to-int conversion (undefined behaviour),
-	// and the average inactive expression is printed as "nan%".
 	OutputBuilder builder;
 	builder.matches = { makeMatch("c1", "X:10:A:G", false, 1), makeMatch("c1", "X:10:A:G", true, 1) };
 	TempFile file { ".txt" };

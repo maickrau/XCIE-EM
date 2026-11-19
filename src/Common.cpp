@@ -109,7 +109,7 @@ size_t parseVariantPosition(const std::string& name)
 
 std::tuple<std::string, size_t, size_t> parseBedRegion(const std::string& region)
 {
-	std::regex regex { "^([chrCHR0123456789XYMxymt])+:([0-9]+)-([0-9]+)$" };
+	std::regex regex { "^([chrCHR0123456789XYMxymt]+):([0-9]+)-([0-9]+)$" };
 	std::smatch matches;
 	if (std::regex_match(region, matches, regex))
 	{
