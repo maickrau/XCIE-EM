@@ -105,11 +105,35 @@ TEST_CASE("readScReadCountsMatchCounts")
 	REQUIRE(matches.size() == 7);
 	CHECK(sameMatch(matches[0], makeMatch("cell1", "X:100:A:G", false, 3)));
 	CHECK(sameMatch(matches[1], makeMatch("cell1", "X:100:A:G", true, 2)));
-	CHECK(sameMatch(matches[2], makeMatch("cell2", "chrX:200:C:T", false, 4)));
+	// variant names for chrX spelled differently are checked in a separate test below
+	CHECK(matches[2].cell == "cell2");
+	CHECK(matches[2].alt == false);
+	CHECK(matches[2].count == 4);
+	CHECK(parseVariantPosition(matches[2].variant) == 200);
 	CHECK(sameMatch(matches[3], makeMatch("cell3", "23:300:G:A", true, 6)));
-	CHECK(sameMatch(matches[4], makeMatch("cell4", "x:400:T:C", false, 1)));
-	CHECK(sameMatch(matches[5], makeMatch("cell4", "x:400:T:C", true, 1)));
-	CHECK(sameMatch(matches[6], makeMatch("cell4", "ChrX:500:T:C", true, 1)));
+	CHECK(matches[4].alt == false);
+	CHECK(matches[4].count == 1);
+	CHECK(matches[5].alt == true);
+	CHECK(matches[5].variant == matches[4].variant);
+	CHECK(parseVariantPosition(matches[5].variant) == 400);
+	CHECK(matches[6].alt == true);
+	CHECK(parseVariantPosition(matches[6].variant) == 500);
+}
+
+TEST_CASE("readScReadCountsMatchCounts names chrX variants like the BAM input and the forced phase format" * doctest::should_fail())
+{
+	// BUG: the variant name is built from the raw CHROM column, so scReadCounts input with
+	// CHROM "chrX" gives names like "chrX:200:C:T". The BAM input strips "chr" ("X:200:C:T"),
+	// and the README specifies "X:(position):(ref):(alt)" for --force-phase. With chrX-named
+	// scReadCounts input every trio-phased variant is silently ignored.
+	std::string contents = scReadCountsHeader;
+	contents += scReadCountsLine("chrX", 200, 'C', 'T', "cell2", 1, 4);
+	contents += scReadCountsLine("ChrX", 300, 'C', 'T', "cell2", 1, 4);
+	TempFile file { ".tsv", contents };
+	auto matches = readScReadCountsMatchCounts(file.path);
+	REQUIRE(matches.size() == 4);
+	CHECK(matches[0].variant == "X:200:C:T");
+	CHECK(matches[2].variant == "X:300:C:T");
 }
 
 TEST_CASE("readScReadCountsMatchCounts with only a header")
@@ -344,6 +368,25 @@ TEST_CASE("getGeneInfoFromStream reads the last line even without a trailing new
 	gff.pop_back();
 	std::istringstream stream { gff };
 	CHECK(getGeneInfoFromStream(stream, true).size() == 2);
+}
+
+TEST_CASE("readCellGrouping handles Windows line endings" * doctest::should_fail())
+{
+	// BUG (minor): no reader strips '\r', so a cell group file saved with CRLF line endings
+	// gives group names like "Tcell\r", which then end up inside the output tables.
+	TempFile file { ".tsv", "barcode\tgroup\r\nAAA\tTcell\r\n" };
+	auto grouping = readCellGrouping(file.path);
+	REQUIRE(grouping.count("AAA") == 1);
+	CHECK(grouping.at("AAA") == "Tcell");
+}
+
+TEST_CASE("getGeneInfoFromStream handles Windows line endings" * doctest::should_fail())
+{
+	// BUG (minor): the last GFF3 attribute keeps the '\r', eg gene_name "GENE1\r"
+	std::istringstream stream { "chrX\tHAVANA\tgene\t1\t20\t.\t+\t.\tgene_id=G1;gene_type=protein_coding;gene_name=GENE1\r\n" };
+	auto genes = getGeneInfoFromStream(stream, true);
+	REQUIRE(genes.size() == 1);
+	CHECK(std::get<3>(genes[0]) == "GENE1");
 }
 
 TEST_CASE("readBarcodeWhitelist")

@@ -319,6 +319,19 @@ TEST_CASE("binomial p-values are monotonic")
 	}
 }
 
+TEST_CASE("binomial p-values are fast for large numbers of trials" * doctest::should_fail() * doctest::timeout(0.5))
+{
+	// BUG (performance): getBinomialPValueGreaterThan/LessThan sum O(trials) terms and each
+	// term calls logNChooseK which is itself O(k), so the cost is quadratic in the number of
+	// reads: ~2 s for 30000 reads and ~25 s for 100000 reads. The pseudobulk outputs compute
+	// this for every variant and gene, and highly expressed genes (eg XIST) can have far more
+	// reads than that. Computing the terms incrementally (or using lgamma / the regularized
+	// incomplete beta function) makes this linear or constant time.
+	double over = getBinomialPValueGreaterThan(0.1, 3000, 30000);
+	double under = getBinomialPValueLessThan(0.1, 3000, 30000);
+	CHECK(over + under > 1.0);
+}
+
 TEST_CASE("binomial p-values with large number of trials")
 {
 	double over = getBinomialPValueGreaterThan(0.1, 1000, 10000);
