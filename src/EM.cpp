@@ -184,8 +184,9 @@ double getCellLogProbDerivative(const EMResult& result, const EMHelperVariables&
 		const double Xe = result.variantEscapeFraction[variant];
 		assert(Xe >= escapeBoundary - epsilon);
 		assert(Xe <= maxEscape - escapeBoundary + epsilon);
-		const bool activeMatchPhase = (result.variantIsMatRef[variant] == matActive);
-		const double weight = helpers.variantWeight[variant];
+		const double weight = std::fabs(helpers.variantWeight[variant]);
+		const bool flipXISTPhase = helpers.variantWeight[variant] < 0;
+		const bool activeMatchPhase = flipXISTPhase ^ (result.variantIsMatRef[variant] == matActive);
 		if (refCount > 0)
 		{
 			derivativeSum += logprobDerivativeCe(refCount, Ce, Xe, weight, activeMatchPhase);
@@ -214,9 +215,10 @@ double getCellLogProb(const EMResult& result, const EMHelperVariables& helpers, 
 		assert(Xe >= escapeBoundary - epsilon);
 		assert(Xe <= maxEscape - escapeBoundary + epsilon);
 		const size_t c_i = helpers.variantCoverage[variant];
-		const bool activeMatchPhase = (result.variantIsMatRef[variant] == matActive);
 		assert(refCount+altCount <= c_i);
-		const double weight = helpers.variantWeight[variant];
+		const double weight = std::fabs(helpers.variantWeight[variant]);
+		const bool flipXISTPhase = helpers.variantWeight[variant] < 0;
+		const bool activeMatchPhase = flipXISTPhase ^ (result.variantIsMatRef[variant] == matActive);
 		if (refCount > 0)
 		{
 			logProbSum += logprob(refCount, f_j, c_i, Ce, Xe, weight, activeMatchPhase) - logprob(0, f_j, c_i, Ce, Xe, weight, activeMatchPhase);
@@ -232,14 +234,15 @@ double getCellLogProb(const EMResult& result, const EMHelperVariables& helpers, 
 double getVariantLogProbDerivative(const EMResult& result, const EMHelperVariables& helpers, const size_t variant, const double Xe, const bool matRef)
 {
 	double derivativeSum = 0;
-	const double weight = helpers.variantWeight[variant];
+	const double weight = std::fabs(helpers.variantWeight[variant]);
+	const bool flipXISTPhase = helpers.variantWeight[variant] < 0;
 	for (const auto& t : helpers.activeCellsPerVariant[variant])
 	{
 		const size_t cell = std::get<0>(t);
 		const size_t refCount = std::get<1>(t);
 		const size_t altCount = std::get<2>(t);
 		const double Ce = result.cellEscapeFraction[cell];
-		const bool activeMatchPhase = (result.cellIsMatActive[cell] == matRef);
+		const bool activeMatchPhase = flipXISTPhase ^ (result.cellIsMatActive[cell] == matRef);
 		if (refCount > 0)
 		{
 			derivativeSum += logprobDerivativeXe(refCount, Ce, Xe, weight, activeMatchPhase);
@@ -256,7 +259,8 @@ double getVariantLogProbs(const EMResult& result, const EMHelperVariables& helpe
 {
 	const size_t c_i = helpers.variantCoverage.at(variant);
 	double logProbSum = 0;
-	const double weight = helpers.variantWeight[variant];
+	const double weight = std::fabs(helpers.variantWeight[variant]);
+	const bool flipXISTPhase = helpers.variantWeight[variant] < 0;
 	for (const auto& t : helpers.activeCellsPerVariant[variant])
 	{
 		const size_t cell = std::get<0>(t);
@@ -264,7 +268,7 @@ double getVariantLogProbs(const EMResult& result, const EMHelperVariables& helpe
 		const size_t altCount = std::get<2>(t);
 		const double f_j = helpers.cellCoverageFraction[cell];
 		const double Ce = result.cellEscapeFraction[cell];
-		const bool activeMatchPhase = (result.cellIsMatActive[cell] == matRef);
+		const bool activeMatchPhase = flipXISTPhase ^ (result.cellIsMatActive[cell] == matRef);
 		if (refCount > 0)
 		{
 			logProbSum += logprob(refCount, f_j, c_i, Ce, Xe, weight, activeMatchPhase) - logprob(0, f_j, c_i, Ce, Xe, weight, activeMatchPhase);
@@ -698,7 +702,8 @@ double getNonnormalizedTotalLogProb(const EMResult& result, const EMHelperVariab
 		const double Xe = result.variantEscapeFraction.at(variant);
 		const double c_i = helpers.variantCoverage.at(variant);
 		const bool variantIsMat = result.variantIsMatRef[variant];
-		const double weight = helpers.variantWeight[variant];
+		const double weight = std::fabs(helpers.variantWeight[variant]);
+		const bool flipXISTPhase = helpers.variantWeight[variant] < 0;
 		for (const auto& t : helpers.activeCellsPerVariant[variant])
 		{
 			const size_t cell = std::get<0>(t);
@@ -707,8 +712,8 @@ double getNonnormalizedTotalLogProb(const EMResult& result, const EMHelperVariab
 			const double Ce = result.cellEscapeFraction[cell];
 			const bool cellIsMat = result.cellIsMatActive[cell];
 			const double f_j = helpers.cellCoverageFraction[cell];
-			if (refCount > 0) total += logprob(refCount, f_j, c_i, Ce, Xe, weight, variantIsMat == cellIsMat) - logprob(0, f_j, c_i, Ce, Xe, weight, variantIsMat == cellIsMat);
-			if (altCount > 0) total += logprob(altCount, f_j, c_i, Ce, Xe, weight, variantIsMat != cellIsMat) - logprob(0, f_j, c_i, Ce, Xe, weight, variantIsMat != cellIsMat);
+			if (refCount > 0) total += logprob(refCount, f_j, c_i, Ce, Xe, weight, flipXISTPhase ^ (variantIsMat == cellIsMat)) - logprob(0, f_j, c_i, Ce, Xe, weight, flipXISTPhase ^ (variantIsMat == cellIsMat));
+			if (altCount > 0) total += logprob(altCount, f_j, c_i, Ce, Xe, weight, flipXISTPhase ^ (variantIsMat != cellIsMat)) - logprob(0, f_j, c_i, Ce, Xe, weight, flipXISTPhase ^ (variantIsMat != cellIsMat));
 		}
 	}
 	return total;

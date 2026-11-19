@@ -620,12 +620,8 @@ TEST_CASE("binary searched escapes are the best values on the 0.001 grid")
 	}
 }
 
-TEST_CASE("binary searched escapes with a negatively weighted (XIST) variant" * doctest::should_fail())
+TEST_CASE("binary searched escapes with a negatively weighted (XIST) variant")
 {
-	// BUG (minor): XIST regions get weight -1, which makes that variant's log likelihood term
-	// convex instead of concave. binarySearchOptimalCe / binarySearchOptimalXe assume a concave
-	// objective (monotonically decreasing derivative) and can then return an escape value
-	// that is clearly worse than the best value on the grid.
 	size_t worse = 0;
 	size_t total = 0;
 	double worstDifference = 0;
