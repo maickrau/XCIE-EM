@@ -15,7 +15,7 @@ using TestHelpers::abortsInChild;
 namespace
 {
 
-std::vector<BamTools::CigarOp> parseCigar(const std::string& cigar)
+std::vector<BamTools::CigarOp> parseCigarInternal(const std::string& cigar)
 {
 	std::vector<BamTools::CigarOp> result;
 	size_t length = 0;
@@ -68,7 +68,7 @@ BamTools::BamAlignment makeAlignment(const ReadSpec& spec, size_t readIndex)
 	aln.Position = spec.position;
 	aln.QueryBases = spec.sequence;
 	aln.Qualities = std::string(spec.sequence.size(), 'I');
-	aln.CigarData = parseCigar(spec.cigar.size() > 0 ? spec.cigar : std::to_string(spec.sequence.size()) + "M");
+	aln.CigarData = parseCigarInternal(spec.cigar.size() > 0 ? spec.cigar : std::to_string(spec.sequence.size()) + "M");
 	aln.MapQuality = 60;
 	aln.MateRefID = -1;
 	aln.MatePosition = -1;
@@ -688,6 +688,31 @@ TEST_CASE("getSNPMatchesFromBamVcf")
 		auto matches = getSNPMatchesFromBamVcf(std::vector<std::string> { bam1.path, bam2.path }, vcf.path, { "AAA" }, false);
 		CHECK(matches.size() == 3);
 	}
+}
+
+TEST_CASE("parseCigar")
+{
+	std::string cigar { "123M213S2H3=1X5D4I8N25P" };
+	std::vector<CigarData> parsed = parseCigar(cigar);
+	REQUIRE(parsed.size() == 9);
+	CHECK(parsed[0].Length == 123);
+	CHECK(parsed[0].Type == 'M');
+	CHECK(parsed[1].Length == 213);
+	CHECK(parsed[1].Type == 'S');
+	CHECK(parsed[2].Length == 2);
+	CHECK(parsed[2].Type == 'H');
+	CHECK(parsed[3].Length == 3);
+	CHECK(parsed[3].Type == '=');
+	CHECK(parsed[4].Length == 1);
+	CHECK(parsed[4].Type == 'X');
+	CHECK(parsed[5].Length == 5);
+	CHECK(parsed[5].Type == 'D');
+	CHECK(parsed[6].Length == 4);
+	CHECK(parsed[6].Type == 'I');
+	CHECK(parsed[7].Length == 8);
+	CHECK(parsed[7].Type == 'N');
+	CHECK(parsed[8].Length == 25);
+	CHECK(parsed[8].Type == 'P');
 }
 
 }

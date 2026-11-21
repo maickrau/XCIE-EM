@@ -4,7 +4,6 @@
 #include <string>
 #include <unordered_map>
 #include <algorithm>
-#include <api/BamReader.h>
 #include <zstr.hpp> //https://github.com/mateidavid/zstr
 #include "Common.h"
 #include "SNPCounter.h"
@@ -106,25 +105,6 @@ std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>> rea
 	}
 	Logger::Log.log(Logger::LogLevel::DebugInfo) << totalVariants << " variants" << std::endl;
 	return refVariants;
-}
-
-std::string readBarcode(const BamTools::BamAlignment& aln)
-{
-	std::string result;
-	aln.GetTag("CB", result);
-	if (result == "" || result == "-") aln.GetTag("CR", result);
-	if (result == "-") result = "";
-	return result;
-}
-
-std::string readUMI(const BamTools::BamAlignment& aln)
-{
-	std::string result;
-	aln.GetTag("UB", result);
-	if (result == "" || result == "-") aln.GetTag("UR", result);
-	if (result == "" || result == "-") aln.GetTag("XM", result);
-	if (result == "-") result = "";
-	return result;
 }
 
 std::vector<SNPMatch> countSNPsFromBamVcf(const std::string& vcfFile, const std::string& bamFile)
@@ -250,3 +230,91 @@ std::vector<SNPMatch> parseSNPMatches(const std::string& currentChromosome, cons
 	}
 	return parsed;
 }
+
+std::string readBarcode(const std::vector<std::string>& parts)
+{
+	std::string CBresult = "";
+	std::string CRresult = "";
+	for (const std::string& str : parts)
+	{
+		if (str.size() > 5 && str.substr(0, 5) == "CB:Z:")
+		{
+			CBresult = str.substr(5);
+		}
+		if (str.size() > 5 && str.substr(0, 5) == "CR:Z:")
+		{
+			CRresult = str.substr(5);
+		}
+	}
+	if (CBresult != "" && CBresult != "-") return CBresult;
+	if (CRresult != "" && CRresult != "-") return CRresult;
+	return "";
+}
+
+std::string readUMI(const std::vector<std::string>& parts)
+{
+	std::string UBresult = "";
+	std::string URresult = "";
+	std::string XMresult = "";
+	for (const std::string& str : parts)
+	{
+		if (str.size() > 5 && str.substr(0, 5) == "UB:Z:")
+		{
+			UBresult = str.substr(5);
+		}
+		if (str.size() > 5 && str.substr(0, 5) == "UR:Z:")
+		{
+			URresult = str.substr(5);
+		}
+		if (str.size() > 5 && str.substr(0, 5) == "XM:Z:")
+		{
+			XMresult = str.substr(5);
+		}
+	}
+	if (UBresult != "" && UBresult != "-") return UBresult;
+	if (URresult != "" && URresult != "-") return URresult;
+	if (XMresult != "" && XMresult != "-") return XMresult;
+	return "";
+}
+
+std::vector<CigarData> parseCigar(const std::string& str)
+{
+	std::vector<CigarData> result;
+	size_t lastStart = 0;
+	for (size_t i = 0; i < str.size(); i++)
+	{
+		if (str[i] == 'M' || str[i] == 'I' || str[i] == 'D' || str[i] == 'N' || str[i] == 'S' || str[i] == 'H' || str[i] == 'P' || str[i] == '=' || str[i] == 'X')
+		{
+			result.emplace_back();
+			result.back().Type = str[i];
+			result.back().Length = std::stoull(str.substr(lastStart, i-lastStart));
+			lastStart = i+1;
+		}
+	}
+	return result;
+}
+
+#ifndef NOBAMTOOLSLIB
+
+#include <api/BamReader.h>
+
+std::string readBarcode(const BamTools::BamAlignment& aln)
+{
+	std::string result;
+	aln.GetTag("CB", result);
+	if (result == "" || result == "-") aln.GetTag("CR", result);
+	if (result == "-") result = "";
+	return result;
+}
+
+std::string readUMI(const BamTools::BamAlignment& aln)
+{
+	std::string result;
+	aln.GetTag("UB", result);
+	if (result == "" || result == "-") aln.GetTag("UR", result);
+	if (result == "" || result == "-") aln.GetTag("XM", result);
+	if (result == "-") result = "";
+	return result;
+}
+
+#endif
