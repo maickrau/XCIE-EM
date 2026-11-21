@@ -1,155 +1,36 @@
 #include <map>
 #include <sstream>
 #include <algorithm>
-#include <api/BamWriter.h>
-#include <api/BamAlignment.h>
 #include <zstr.hpp>
 #include "../src/SNPCounter.h"
 #include "InternalDeclarations.h"
 #include "TestHelpers.h"
+#include "AlignmentTestData.h"
+#include "BamTestHelpers.h"
 #include "doctest.h"
 
 using TestHelpers::TempFile;
 using TestHelpers::abortsInChild;
+using namespace AlignmentTestData;
+
+#ifndef NOBAMTOOLSLIB
+
+using namespace BamTestHelpers;
 
 namespace
 {
 
-std::vector<BamTools::CigarOp> parseCigarInternal(const std::string& cigar)
-{
-	std::vector<BamTools::CigarOp> result;
-	size_t length = 0;
-	for (char c : cigar)
-	{
-		if (c >= '0' && c <= '9')
-		{
-			length = length * 10 + (c - '0');
-			continue;
-		}
-		result.emplace_back(c, length);
-		length = 0;
-	}
-	return result;
-}
-
-// read sequence of given length filled with N except the given bases at the given offsets
-std::string readSequence(size_t length, const std::map<size_t, char>& bases)
-{
-	std::string result(length, 'N');
-	for (const auto& pair : bases)
-	{
-		result[pair.first] = pair.second;
-	}
-	return result;
-}
-
-struct ReadSpec
-{
-	int refId = 0;
-	int position = 0;
-	std::string sequence;
-	std::string cigar;
-	std::string CB;
-	std::string UB;
-	std::string CR;
-	std::string UR;
-	bool reverse = false;
-	bool duplicate = false;
-	bool secondary = false;
-	bool failedQC = false;
-	bool unmapped = false;
-};
-
-BamTools::BamAlignment makeAlignment(const ReadSpec& spec, size_t readIndex)
-{
-	BamTools::BamAlignment aln;
-	aln.Name = "read" + std::to_string(readIndex);
-	aln.RefID = spec.refId;
-	aln.Position = spec.position;
-	aln.QueryBases = spec.sequence;
-	aln.Qualities = std::string(spec.sequence.size(), 'I');
-	aln.CigarData = parseCigarInternal(spec.cigar.size() > 0 ? spec.cigar : std::to_string(spec.sequence.size()) + "M");
-	aln.MapQuality = 60;
-	aln.MateRefID = -1;
-	aln.MatePosition = -1;
-	aln.InsertSize = 0;
-	aln.AlignmentFlag = 0;
-	aln.SetIsReverseStrand(spec.reverse);
-	aln.SetIsDuplicate(spec.duplicate);
-	aln.SetIsPrimaryAlignment(!spec.secondary);
-	aln.SetIsFailedQC(spec.failedQC);
-	aln.SetIsMapped(!spec.unmapped);
-	if (spec.CB != "") aln.AddTag<std::string>("CB", "Z", spec.CB);
-	if (spec.CR != "") aln.AddTag<std::string>("CR", "Z", spec.CR);
-	if (spec.UB != "") aln.AddTag<std::string>("UB", "Z", spec.UB);
-	if (spec.UR != "") aln.AddTag<std::string>("UR", "Z", spec.UR);
-	return aln;
-}
-
-const std::vector<std::string> defaultReferences { "chrX", "chr1" };
-
-void writeBam(const std::string& path, const std::vector<ReadSpec>& reads, const std::vector<std::string>& references = defaultReferences)
-{
-	BamTools::RefVector refs;
-	std::string header = "@HD\tVN:1.6\tSO:coordinate\n";
-	for (const auto& name : references)
-	{
-		refs.emplace_back(name, 100000);
-		header += "@SQ\tSN:" + name + "\tLN:100000\n";
-	}
-	BamTools::BamWriter writer;
-	REQUIRE(writer.Open(path, header, refs));
-	for (size_t i = 0; i < reads.size(); i++)
-	{
-		bool saved = writer.SaveAlignment(makeAlignment(reads[i], i));
-		INFO(writer.GetErrorString());
-		REQUIRE(saved);
-	}
-	writer.Close();
-}
-
-const std::string vcfHeader = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample\n";
-
-std::string vcfLine(const std::string& chrom, size_t pos, const std::string& ref, const std::string& alt)
-{
-	return chrom + "\t" + std::to_string(pos) + "\t.\t" + ref + "\t" + alt + "\t50\tPASS\t.\tGT\t0/1\n";
-}
-
 std::vector<SNPMatch> streamAll(const std::string& bamPath, const std::string& vcfContents)
 {
-	std::istringstream stream { vcfContents };
-	auto variants = readVariants(stream);
-	for (auto& pair : variants) std::sort(pair.second.begin(), pair.second.end());
+	auto variants = parseVcf(vcfContents);
 	std::vector<SNPMatch> result;
 	streamSNPsFromBam(bamPath, variants, [&result](const SNPMatch& match) { result.push_back(match); });
 	return result;
 }
 
-const SNPMatch* findMatch(const std::vector<SNPMatch>& matches, size_t position, const std::string& barcode)
-{
-	for (const auto& match : matches)
-	{
-		if (match.position == position && match.barcode == barcode) return &match;
-	}
-	return nullptr;
 }
 
-// Variants at 1-based positions 11 (A>G), 21 (C>T), 31 (G>A) on chrX, i.e. 0-based 10, 20, 30.
-const std::string threeVariantVcf = vcfHeader + vcfLine("chrX", 11, "A", "G") + vcfLine("chrX", 21, "C", "T") + vcfLine("chrX", 31, "G", "A");
-
-ReadSpec basicRead(int position, const std::map<size_t, char>& basesAtRefPositions, const std::string& CB, const std::string& UB, size_t length = 40)
-{
-	ReadSpec spec;
-	spec.position = position;
-	std::map<size_t, char> offsets;
-	for (const auto& pair : basesAtRefPositions) offsets[pair.first - position] = pair.second;
-	spec.sequence = readSequence(length, offsets);
-	spec.CB = CB;
-	spec.UB = UB;
-	return spec;
-}
-
-}
+#endif
 
 TEST_SUITE("SNPCounter")
 {
@@ -292,6 +173,8 @@ TEST_CASE("parseSNPMatches counts UMIs per barcode")
 		CHECK(parseSNPMatches("chrX", std::make_tuple<size_t, char, char>(0, 'A', 'G'), {}).empty());
 	}
 }
+
+#ifndef NOBAMTOOLSLIB
 
 TEST_CASE("readBarcode and readUMI")
 {
@@ -689,6 +572,8 @@ TEST_CASE("getSNPMatchesFromBamVcf")
 		CHECK(matches.size() == 3);
 	}
 }
+
+#endif
 
 TEST_CASE("parseCigar")
 {
