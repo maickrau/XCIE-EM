@@ -88,3 +88,4 @@ The pseudobulk variant and gene files have columns `pvalue_Xiover10_unadjusted` 
 - `--EM-noise-decay`: Decay speed of noise in EM algorithm. Default 0.95 usually works well.
 - `--EM-random-seed`: Random seed used for EM initialization.
 - `--EM-num-runs`: Number of initializations used for EM. The best result is picked out of all runs.
+- `--min-het-fraction`: Minimum fraction of minor allele expression per variant to keep the variant. The EM algorithm requires homozygous variants to be filtered out. If your sample has very high skew, you can lower this value to keep more variants, but in that case you need to make sure that only genuinely heterozygous variants were given to `--input-vcf`.
