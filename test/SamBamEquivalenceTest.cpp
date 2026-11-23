@@ -225,10 +225,8 @@ TEST_CASE("SAM and BAM readers agree on getSNPMatchesFromBamVcf level output")
 	}
 }
 
-TEST_CASE("SAM and BAM readers agree when a tag appears twice" * doctest::should_fail())
+TEST_CASE("SAM and BAM readers agree when a tag appears twice")
 {
-	// BUG (minor): bamtools GetTag returns the first CB tag, while the SAM reader's
-	// readBarcode loops over all fields and keeps the last one.
 	ReadSpec read = basicRead(5, { { 10, 'A' } }, "FIRST", "U1");
 	read.extraTags.push_back("CB:Z:SECOND");
 	auto results = compareReaders({ read }, threeVariantVcf);
@@ -236,19 +234,15 @@ TEST_CASE("SAM and BAM readers agree when a tag appears twice" * doctest::should
 	CHECK(results.second.matches[0].barcode == "FIRST");
 }
 
-TEST_CASE("SAM and BAM readers agree when a non-tag field looks like a tag" * doctest::should_fail())
+TEST_CASE("SAM and BAM readers agree when a non-tag field looks like a tag")
 {
-	// BUG (minor): the SAM readBarcode/readUMI scan all fields including QNAME, SEQ and QUAL,
-	// so a read named eg "CB:Z:FAKE" without a CB tag gets barcode "FAKE" from the SAM reader
-	// but no barcode from bamtools. Only fields 12 onwards are optional tags.
 	ReadSpec read = basicRead(5, { { 10, 'A' } }, "", "U1");
 	read.name = "CB:Z:FAKE";
 	compareReaders({ read }, threeVariantVcf);
 }
 
-TEST_CASE("SAM reader with Windows line endings agrees with BAM" * doctest::should_fail())
+TEST_CASE("SAM reader with Windows line endings agrees with BAM")
 {
-	// BUG: see "streamSNPsFromSam handles Windows line endings"
 	auto reads = std::vector<ReadSpec> {
 		basicRead(5, { { 10, 'G' } }, "AAA", "U1"),
 		basicRead(5, { { 10, 'A' } }, "AAA", "U2"),

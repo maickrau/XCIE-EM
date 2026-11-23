@@ -231,50 +231,23 @@ std::vector<SNPMatch> parseSNPMatches(const std::string& currentChromosome, cons
 	return parsed;
 }
 
-std::string readBarcode(const std::vector<std::string>& parts)
+std::string readBarcode(const std::unordered_map<std::string, std::string>& tags)
 {
-	std::string CBresult = "";
-	std::string CRresult = "";
-	for (const std::string& str : parts)
-	{
-		if (str.size() > 5 && str.substr(0, 5) == "CB:Z:")
-		{
-			CBresult = str.substr(5);
-		}
-		if (str.size() > 5 && str.substr(0, 5) == "CR:Z:")
-		{
-			CRresult = str.substr(5);
-		}
-	}
-	if (CBresult != "" && CBresult != "-") return CBresult;
-	if (CRresult != "" && CRresult != "-") return CRresult;
-	return "";
+	std::string result;
+	if (tags.count("CB:Z:") == 1) result = tags.at("CB:Z:");
+	if ((result == "" || result == "-") && tags.count("CR:Z:") == 1) result = tags.at("CR:Z:");
+	if (result == "-") result = "";
+	return result;
 }
 
-std::string readUMI(const std::vector<std::string>& parts)
+std::string readUMI(const std::unordered_map<std::string, std::string>& tags)
 {
-	std::string UBresult = "";
-	std::string URresult = "";
-	std::string XMresult = "";
-	for (const std::string& str : parts)
-	{
-		if (str.size() > 5 && str.substr(0, 5) == "UB:Z:")
-		{
-			UBresult = str.substr(5);
-		}
-		if (str.size() > 5 && str.substr(0, 5) == "UR:Z:")
-		{
-			URresult = str.substr(5);
-		}
-		if (str.size() > 5 && str.substr(0, 5) == "XM:Z:")
-		{
-			XMresult = str.substr(5);
-		}
-	}
-	if (UBresult != "" && UBresult != "-") return UBresult;
-	if (URresult != "" && URresult != "-") return URresult;
-	if (XMresult != "" && XMresult != "-") return XMresult;
-	return "";
+	std::string result;
+	if (tags.count("UB:Z:") == 1) result = tags.at("UB:Z:");
+	if ((result == "" || result == "-") && tags.count("UR:Z:") == 1) result = tags.at("UR:Z:");
+	if ((result == "" || result == "-") && tags.count("XM:Z:") == 1) result = tags.at("XM:Z:");
+	if (result == "-") result = "";
+	return result;
 }
 
 std::vector<CigarData> parseCigar(const std::string& str)
@@ -290,6 +263,22 @@ std::vector<CigarData> parseCigar(const std::string& str)
 			result.back().Length = std::stoull(str.substr(lastStart, i-lastStart));
 			lastStart = i+1;
 		}
+	}
+	return result;
+}
+
+std::unordered_map<std::string, std::string> parseSAMTags(const std::vector<std::string>& parts)
+{
+	std::unordered_map<std::string, std::string> result;
+	for (size_t i = 11; i < parts.size(); i++)
+	{
+		const std::string& part = parts[i];
+		if (part.size() < 5) continue;
+		if (part[2] != ':' || part[4] != ':') continue;
+		std::string key = part.substr(0, 5);
+		std::string value = part.substr(5);
+		if (result.count(key) == 1) continue; // bamtools lib only reads first tag, keep same implementation here
+		result[key] = value;
 	}
 	return result;
 }

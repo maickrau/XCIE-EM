@@ -44,9 +44,10 @@ void sortSNPMatches(std::vector<SNPMatch>& matches);
 std::vector<SNPMatch> parseSNPMatches(const std::string& currentChromosome, const std::tuple<size_t, char, char>& currentVariant, const std::unordered_map<std::string, std::unordered_map<std::string, std::tuple<bool, bool, bool, bool>>>& matches);
 
 
-std::string readBarcode(const std::vector<std::string>& parts);
-std::string readUMI(const std::vector<std::string>& parts);
+std::string readBarcode(const std::unordered_map<std::string, std::string>& parts);
+std::string readUMI(const std::unordered_map<std::string, std::string>& parts);
 std::vector<CigarData> parseCigar(const std::string& str);
+std::unordered_map<std::string, std::string> parseSAMTags(const std::vector<std::string>& parts);
 
 template <typename F>
 std::tuple<size_t, size_t> streamSNPsFromSam(const std::string& bamFile, const std::unordered_map<std::string, std::vector<std::tuple<size_t, char, char>>>& refvariants, F callback)
@@ -72,6 +73,7 @@ std::tuple<size_t, size_t> streamSNPsFromSam(const std::string& bamFile, const s
 	{
 		std::getline(file, line);
 		if (line.size() == 0) continue;
+		if (line.back() == '\r') line.pop_back();
 		if (line[0] == '@') continue;
 		auto parts = split(line, '\t');
 		uint64_t flags = std::stoull(parts[1]);
@@ -139,8 +141,9 @@ std::tuple<size_t, size_t> streamSNPsFromSam(const std::string& bamFile, const s
 		size_t j = currentChromosomeSNPIndex;
 		size_t refpos = position;
 		size_t readpos = 0;
-		std::string barcode = readBarcode(parts);
-		std::string umi = readUMI(parts);
+		auto tags = parseSAMTags(parts);
+		std::string barcode = readBarcode(tags);
+		std::string umi = readUMI(tags);
 		if (barcode == "") continue;
 		if (umi == "") continue;
 		readsWithTag += 1;

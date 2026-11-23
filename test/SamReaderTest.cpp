@@ -67,53 +67,57 @@ TEST_CASE("readBarcode and readUMI from SAM fields")
 	SUBCASE("primary tags")
 	{
 		auto parts = fields({ "CB:Z:AAA-1", "CR:Z:AAB", "UB:Z:UMI1", "UR:Z:UMI2", "XM:Z:UMI3" });
-		CHECK(readBarcode(parts) == "AAA-1");
-		CHECK(readUMI(parts) == "UMI1");
+		auto tags = parseSAMTags(parts);
+		CHECK(readBarcode(tags) == "AAA-1");
+		CHECK(readUMI(tags) == "UMI1");
 	}
 	SUBCASE("tag order doesn't matter")
 	{
 		auto parts = fields({ "XM:Z:UMI3", "UR:Z:UMI2", "UB:Z:UMI1", "CR:Z:AAB", "CB:Z:AAA-1" });
-		CHECK(readBarcode(parts) == "AAA-1");
-		CHECK(readUMI(parts) == "UMI1");
+		auto tags = parseSAMTags(parts);
+		CHECK(readBarcode(tags) == "AAA-1");
+		CHECK(readUMI(tags) == "UMI1");
 	}
 	SUBCASE("fallback to raw tags")
 	{
 		auto parts = fields({ "CR:Z:AAB", "UR:Z:UMI2" });
-		CHECK(readBarcode(parts) == "AAB");
-		CHECK(readUMI(parts) == "UMI2");
+		auto tags = parseSAMTags(parts);
+		CHECK(readBarcode(tags) == "AAB");
+		CHECK(readUMI(tags) == "UMI2");
 	}
 	SUBCASE("dash is treated as missing")
 	{
 		auto parts = fields({ "CB:Z:-", "CR:Z:AAB", "UB:Z:-", "UR:Z:-", "XM:Z:UMI3" });
-		CHECK(readBarcode(parts) == "AAB");
-		CHECK(readUMI(parts) == "UMI3");
+		auto tags = parseSAMTags(parts);
+		CHECK(readBarcode(tags) == "AAB");
+		CHECK(readUMI(tags) == "UMI3");
 	}
 	SUBCASE("only dashes or nothing")
 	{
-		CHECK(readBarcode(fields({ "CB:Z:-", "CR:Z:-" })) == "");
-		CHECK(readUMI(fields({ "UB:Z:-", "UR:Z:-", "XM:Z:-" })) == "");
-		CHECK(readBarcode(fields({})) == "");
-		CHECK(readUMI(fields({})) == "");
+		CHECK(readBarcode(parseSAMTags(fields({ "CB:Z:-", "CR:Z:-" }))) == "");
+		CHECK(readUMI(parseSAMTags(fields({ "UB:Z:-", "UR:Z:-", "XM:Z:-" }))) == "");
+		CHECK(readBarcode(parseSAMTags(fields({}))) == "");
+		CHECK(readUMI(parseSAMTags(fields({}))) == "");
 	}
 	SUBCASE("empty values are treated as missing")
 	{
-		CHECK(readBarcode(fields({ "CB:Z:", "CR:Z:AAB" })) == "AAB");
-		CHECK(readUMI(fields({ "UB:Z:", "UR:Z:UMI2" })) == "UMI2");
+		CHECK(readBarcode(parseSAMTags(fields({ "CB:Z:", "CR:Z:AAB" }))) == "AAB");
+		CHECK(readUMI(parseSAMTags(fields({ "UB:Z:", "UR:Z:UMI2" }))) == "UMI2");
 	}
 	SUBCASE("values can contain colons")
 	{
-		CHECK(readBarcode(fields({ "CB:Z:sample1:AAA-1" })) == "sample1:AAA-1");
-		CHECK(readUMI(fields({ "UB:Z:a:b:c" })) == "a:b:c");
+		CHECK(readBarcode(parseSAMTags(fields({ "CB:Z:sample1:AAA-1" }))) == "sample1:AAA-1");
+		CHECK(readUMI(parseSAMTags(fields({ "UB:Z:a:b:c" }))) == "a:b:c");
 	}
 	SUBCASE("tags of other types with the same name are ignored")
 	{
-		CHECK(readBarcode(fields({ "CB:i:5", "CR:Z:AAB" })) == "AAB");
-		CHECK(readUMI(fields({ "UB:i:5" })) == "");
+		CHECK(readBarcode(parseSAMTags(fields({ "CB:i:5", "CR:Z:AAB" }))) == "AAB");
+		CHECK(readUMI(parseSAMTags(fields({ "UB:i:5" }))) == "");
 	}
 	SUBCASE("similarly named tags are not confused")
 	{
-		CHECK(readBarcode(fields({ "CY:Z:FFFF", "XCB:Z:AAA" })) == "");
-		CHECK(readUMI(fields({ "UY:Z:FFFF", "XUB:Z:AAA", "RG:Z:XM:Z:foo" })) == "");
+		CHECK(readBarcode(parseSAMTags(fields({ "CY:Z:FFFF", "XCB:Z:AAA" }))) == "");
+		CHECK(readUMI(parseSAMTags(fields({ "UY:Z:FFFF", "XUB:Z:AAA", "RG:Z:XM:Z:foo" }))) == "");
 	}
 }
 
@@ -366,10 +370,8 @@ TEST_CASE("streamSNPsFromSam text format edge cases")
 	}
 }
 
-TEST_CASE("streamSNPsFromSam handles Windows line endings" * doctest::should_fail())
+TEST_CASE("streamSNPsFromSam handles Windows line endings")
 {
-	// BUG: lines are not stripped of '\r', so with CRLF line endings the last field of each
-	// line keeps a trailing '\r'. When the CB tag is last the barcode becomes "AAA\r".
 	auto reads = std::vector<ReadSpec> { basicRead(5, { { 10, 'G' } }, "", "U1"), basicRead(5, { { 10, 'A' } }, "", "U2") };
 	// barcode tag last, so a leftover '\r' would end up in the barcode
 	reads[0].extraTags.push_back("CB:Z:AAA");
