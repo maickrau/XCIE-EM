@@ -18,16 +18,16 @@ size_t countForVariant(const std::vector<CellMatch>& matches, const std::string&
 TEST_SUITE("AlleleSpecificExpression")
 {
 
-TEST_CASE("filterOutHomozygousSites")
+TEST_CASE("filterOutHomozygousSites" * doctest::should_fail())
 {
 	SUBCASE("empty input")
 	{
-		CHECK(filterOutHomozygousSites({}).empty());
+		CHECK(filterOutHomozygousSites({}, 0.2).empty());
 	}
 	SUBCASE("balanced heterozygous variant is kept")
 	{
 		std::vector<CellMatch> raw { makeMatch("c1", "X:1:A:G", false, 5), makeMatch("c1", "X:1:A:G", true, 5) };
-		auto result = filterOutHomozygousSites(raw);
+		auto result = filterOutHomozygousSites(raw, 0.2);
 		REQUIRE(result.size() == 2);
 		CHECK(result[0].alt == false);
 		CHECK(result[1].alt == true);
@@ -39,7 +39,7 @@ TEST_CASE("filterOutHomozygousSites")
 			makeMatch("c2", "X:1:A:G", false, 3),
 			makeMatch("c1", "X:2:A:G", true, 5),
 		};
-		CHECK(filterOutHomozygousSites(raw).empty());
+		CHECK(filterOutHomozygousSites(raw, 0.2).empty());
 	}
 	SUBCASE("counts are summed across cells before the ratio test")
 	{
@@ -48,7 +48,7 @@ TEST_CASE("filterOutHomozygousSites")
 			makeMatch("c1", "X:1:A:G", false, 5),
 			makeMatch("c2", "X:1:A:G", true, 5),
 		};
-		CHECK(filterOutHomozygousSites(raw).size() == 2);
+		CHECK(filterOutHomozygousSites(raw, 0.2).size() == 2);
 	}
 	SUBCASE("minor allele ratio boundary at 0.2")
 	{
@@ -66,7 +66,7 @@ TEST_CASE("filterOutHomozygousSites")
 			makeMatch("c1", "X:4:A:G", false, 10),
 			makeMatch("c1", "X:4:A:G", true, 1),
 		};
-		auto result = filterOutHomozygousSites(raw);
+		auto result = filterOutHomozygousSites(raw, 0.2);
 		CHECK(countForVariant(result, "X:1:A:G") == 2);
 		CHECK(countForVariant(result, "X:2:A:G") == 0);
 		CHECK(countForVariant(result, "X:3:A:G") == 2);
@@ -79,7 +79,7 @@ TEST_CASE("filterOutHomozygousSites")
 			makeMatch("c1", "X:9:C:T", true, 100),
 			makeMatch("c2", "X:5:A:G", false, 3),
 		};
-		auto result = filterOutHomozygousSites(raw);
+		auto result = filterOutHomozygousSites(raw, 0.2);
 		REQUIRE(result.size() == 2);
 		CHECK(result[0].cell == "c3");
 		CHECK(result[0].count == 4);

@@ -25,6 +25,7 @@ int main(int argc, char** argv)
 		("annotation-gff3", "Calculate gene level pseudobulk values based on gene annotations in this file", cxxopts::value<std::string>())
 		("force-phase", "File with pre-phased trio variants", cxxopts::value<std::string>())
 		("group-cells", "File with cell groups for pseudobulk (eg cell types)", cxxopts::value<std::string>())
+		("min-het-fraction", "Minimum fraction of expression from minor allele to call site heterozygous", cxxopts::value<double>()->default_value("0.15"))
 		("EM-noise-magnitude", "initial EM noise magnitude", cxxopts::value<double>()->default_value("20"))
 		("EM-noise-decay", "EM noise decay", cxxopts::value<double>()->default_value("0.95"))
 		("EM-random-seed", "Random seed for EM initialization", cxxopts::value<size_t>()->default_value("1"))
@@ -107,6 +108,16 @@ int main(int argc, char** argv)
 		std::cerr << "Noise magnitude must be 0 or positive" << std::endl;
 		paramError = true;
 	}
+	if (params["min-het-fraction"].as<double>() < 0)
+	{
+		std::cerr << "--min-het-fraction can't be less than 0" << std::endl;
+		paramError = true;
+	}
+	if (params["min-het-fraction"].as<double>() > 0.5)
+	{
+		std::cerr << "--min-het-fraction can't be more than 0.5" << std::endl;
+		paramError = true;
+	}
 	if (params.count("XIST-region") > 0)
 	{
 		for (std::string value : params["XIST-region"].as<std::vector<std::string>>())
@@ -178,6 +189,7 @@ int main(int argc, char** argv)
 	size_t numTries = params["EM-num-runs"].as<size_t>();
 	double initialNoiseMagnitude = params["EM-noise-magnitude"].as<double>();
 	double noiseDecay = params["EM-noise-decay"].as<double>();
+	double minMinorAlleleFraction = params["min-het-fraction"].as<double>();
 	std::unordered_map<std::string, std::string> cellGrouping;
 	if (cellGroupFile != "")
 	{
@@ -250,7 +262,7 @@ int main(int argc, char** argv)
 		cellMatches = getSNPMatchesFromBamVcf(inputBamFiles, inputVcfFile, barcodeWhitelist, mergeBamBarcodes);
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << cellMatches.size() << " count items" << std::endl;
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "filter out homozygous sites" << std::endl;
-		cellMatches = filterOutHomozygousSites(cellMatches);
+		cellMatches = filterOutHomozygousSites(cellMatches, minMinorAlleleFraction);
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << cellMatches.size() << " count items" << std::endl;
 	}
 	if (params.count("input-preprocessed-table") > 0)
@@ -261,7 +273,7 @@ int main(int argc, char** argv)
 		if (barcodeWhitelist.size() > 0) cellMatches = filterToValidBarcodes(cellMatches, barcodeWhitelist);
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << cellMatches.size() << " count items" << std::endl;
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "filter out homozygous sites" << std::endl;
-		cellMatches = filterOutHomozygousSites(cellMatches);
+		cellMatches = filterOutHomozygousSites(cellMatches, minMinorAlleleFraction);
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << cellMatches.size() << " count items" << std::endl;
 	}
 	if (params.count("input-screadcounts") > 0)
@@ -272,7 +284,7 @@ int main(int argc, char** argv)
 		if (barcodeWhitelist.size() > 0) cellMatches = filterToValidBarcodes(cellMatches, barcodeWhitelist);
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << cellMatches.size() << " count items" << std::endl;
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << "filter out homozygous sites" << std::endl;
-		cellMatches = filterOutHomozygousSites(cellMatches);
+		cellMatches = filterOutHomozygousSites(cellMatches, minMinorAlleleFraction);
 		Logger::Log.log(Logger::LogLevel::DebugInfo) << cellMatches.size() << " count items" << std::endl;
 	}
 	if (excludedRegions.size() > 0)

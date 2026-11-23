@@ -10,9 +10,8 @@
 #include "AlleleSpecificExpression.h"
 #include "Common.h"
 
-std::vector<CellMatch> filterOutHomozygousSites(const std::vector<CellMatch>& raw)
+std::vector<CellMatch> filterOutHomozygousSites(const std::vector<CellMatch>& raw, const double minMinorAlleleFraction)
 {
-	const double minMinorAlleleRatio = 0.2;
 	std::unordered_map<std::string, size_t> variantRefCount;
 	std::unordered_map<std::string, size_t> variantAltCount;
 	for (const auto& match : raw)
@@ -29,8 +28,8 @@ std::vector<CellMatch> filterOutHomozygousSites(const std::vector<CellMatch>& ra
 	std::vector<CellMatch> result;
 	for (const auto& match : raw)
 	{
-		if ((double)variantRefCount[match.variant] < (double)variantAltCount[match.variant] * minMinorAlleleRatio) continue;
-		if ((double)variantAltCount[match.variant] < (double)variantRefCount[match.variant] * minMinorAlleleRatio) continue;
+		if ((double)variantRefCount[match.variant] < (double)(variantAltCount[match.variant] + variantRefCount[match.variant]) * minMinorAlleleFraction) continue;
+		if ((double)variantAltCount[match.variant] < (double)(variantRefCount[match.variant] + variantAltCount[match.variant]) * minMinorAlleleFraction) continue;
 		result.emplace_back(match);
 	}
 	return result;

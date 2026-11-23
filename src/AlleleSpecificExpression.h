@@ -17,7 +17,7 @@ public:
 
 
 std::vector<CellMatch> filterToValidBarcodes(const std::vector<CellMatch>& raw, const std::unordered_set<std::string>& validBarcodes);
-std::vector<CellMatch> filterOutHomozygousSites(const std::vector<CellMatch>& raw);
+std::vector<CellMatch> filterOutHomozygousSites(const std::vector<CellMatch>& raw, const double minMinorAlleleFraction);
 std::vector<CellMatch> excludeRegions(const std::vector<CellMatch>& raw, const std::vector<std::pair<size_t, size_t>>& excludedRegions);
 bool hasVariantOverlap(const std::vector<CellMatch>& cellMatches, const std::unordered_map<std::string, bool>& forcedPhases);
 
